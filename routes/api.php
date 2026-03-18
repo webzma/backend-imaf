@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CursoController;
+use App\Http\Controllers\EstudianteController;
+use App\Http\Controllers\ProfesorController;
 use Illuminate\Support\Facades\Route;
 
 // Rutas públicas
@@ -15,21 +18,29 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Solo admin
     Route::middleware('role:admin')->prefix('admin')->group(function () {
-        // Aquí van las rutas del admin
-    });
-
-    // Solo profesor
-    Route::middleware('role:profesor')->prefix('profesor')->group(function () {
-        // Aquí van las rutas del profesor
-    });
-
-    // Solo estudiante
-    Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {
-        // Aquí van las rutas del estudiante
+        Route::apiResource('estudiantes', EstudianteController::class);
+        Route::apiResource('profesores', ProfesorController::class);
+        Route::apiResource('cursos', CursoController::class);
     });
 
     // Profesor y admin
     Route::middleware('role:admin,profesor')->group(function () {
-        // Aquí van rutas compartidas entre admin y profesor
+        Route::get('cursos', [CursoController::class, 'index']);
+        Route::get('cursos/{id}', [CursoController::class, 'show']);
+        Route::get('estudiantes', [EstudianteController::class, 'index']);
+        Route::get('estudiantes/{id}', [EstudianteController::class, 'show']);
+    });
+
+    // Solo profesor
+    Route::middleware('role:profesor')->prefix('profesor')->group(function () {
+        Route::put('perfil/{id}', [ProfesorController::class, 'update']);
+    });
+
+    // Solo estudiante
+    Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {
+        Route::get('cursos', [CursoController::class, 'index']);
+        Route::get('cursos/{id}', [CursoController::class, 'show']);
+        Route::get('perfil/{id}', [EstudianteController::class, 'show']);
+        Route::put('perfil/{id}', [EstudianteController::class, 'update']);
     });
 });

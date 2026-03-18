@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Estudiante;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -12,23 +13,37 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-            'role'     => 'required|in:admin,profesor,estudiante',
+            'name'             => 'required|string|max:255',
+            'email'            => 'required|email|unique:users',
+            'password'         => 'required|string|min:8|confirmed',
+            'cedula'           => 'required|string|unique:estudiantes,cedula',
+            'telefono'         => 'required|string|max:20',
+            'fecha_nacimiento' => 'required|date',
+            'genero'           => 'required|in:masculino,femenino,otro',
         ]);
 
         $user = User::create([
             'name'     => $request->name,
             'email'    => $request->email,
             'password' => $request->password,
-            'role'     => $request->role,
+            'role'     => 'estudiante',
+        ]);
+
+        Estudiante::create([
+            'user_id'          => $user->id,
+            'nombre'           => $request->name,
+            'cedula'           => $request->cedula,
+            'telefono'         => $request->telefono,
+            'fecha_nacimiento' => $request->fecha_nacimiento,
+            'genero'           => $request->genero,
+            'fecha_inscripcion'=> now()->toDateString(),
+            'estado'           => 'activo',
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user'  => $user,
+            'user'  => $user->load('estudiante'),
             'token' => $token,
         ], 201);
     }

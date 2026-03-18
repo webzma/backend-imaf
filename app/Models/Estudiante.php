@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Estudiante extends Model
+{
+    protected $fillable = [
+        'user_id',
+        'curso_id',
+        'nombre',
+        'cedula',
+        'telefono',
+        'fecha_nacimiento',
+        'genero',
+        'fecha_inscripcion',
+        'estado',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'fecha_nacimiento' => 'date',
+            'fecha_inscripcion' => 'date',
+        ];
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function curso()
+    {
+        return $this->belongsTo(Curso::class);
+    }
+}
