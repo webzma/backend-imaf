@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Estudiante;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -52,6 +53,31 @@ class EstudianteController extends Controller
         });
 
         return response()->json($estudiante->load('user', 'curso'), 201);
+    }
+
+    public function showMe()
+    {
+        $estudiante = Estudiante::with('user', 'curso')
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        return response()->json($estudiante);
+    }
+
+    public function updateMe(Request $request)
+    {
+        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        $id = $estudiante->id;
+
+        $data = $request->validate([
+            'telefono'         => 'nullable|string|max:20',
+            'fecha_nacimiento' => 'nullable|date',
+            'genero'           => 'nullable|in:masculino,femenino,otro',
+        ]);
+
+        $estudiante->update($data);
+
+        return response()->json($estudiante->load('user', 'curso'));
     }
 
     public function show(string $id)

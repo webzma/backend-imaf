@@ -40,7 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {
         Route::get('cursos', [CursoController::class, 'index']);
         Route::get('cursos/{id}', [CursoController::class, 'show']);
-        Route::get('perfil/{id}', [EstudianteController::class, 'show']);
-        Route::put('perfil/{id}', [EstudianteController::class, 'update']);
+        Route::get('perfil', [EstudianteController::class, 'showMe']);
+        Route::put('perfil', [EstudianteController::class, 'updateMe']);
     });
 });

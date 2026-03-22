@@ -11,7 +11,7 @@ class CursoController extends Controller
 {
     public function index()
     {
-        return response()->json(Curso::with('profesor')->get());
+        return response()->json(Curso::with('profesor', 'estudiantes.user')->get());
     }
 
     public function store(Request $request)
