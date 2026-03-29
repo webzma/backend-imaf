@@ -1,59 +1,145 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Backend IMAF - Sistema de Gestión de Cursos y Estudiantes
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## Descripción del Proyecto
 
-## About Laravel
+Sistema de gestión de cursos y estudiantes para el **Instituto de la Mujer, Atención a la Familia y Formación para el Trabajo (IMAF)**. Desarrollado por un equipo de estudiantes de la UPTYAB como parte de un proyecto sociotecnológico.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Este repositorio contiene el backend o lado servidor del sistema de gestión de cursos y estudiantes del IMAF. El sistema proporciona una plataforma completa para la administración de cursos educativos, gestión de usuarios y seguimiento del progreso académico, así como la gestión de inscripción, seguimiento y administración de cursos impartidos por el instituto, facilitando la interacción entre administradores, instructores y estudiantes.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Roles del Sistema
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+El sistema cuenta con tres roles principales:
 
-## Learning Laravel
+#### 🎓 **Estudiante**
+- Usuario que se registra en la plataforma
+- Puede inscribirse en los cursos disponibles
+- Solo puede cursar los cursos después de realizar el pago correspondiente
+- Accede al contenido educativo y seguimiento de su progreso
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+#### 👨‍🏫 **Instructor** (profesor)
+- Profesor a cargo de los cursos
+- Gestiona a los alumnos inscritos en sus cursos
+- Define y registra el estado de aprobación de los estudiantes
+- Administra el contenido y evaluaciones del curso
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+#### 👤 **Administrador**
+- Gestión general del sistema
+- Creación y administración de cursos
+- Creación y gestión de instructores
+- Validación de comprobantes de pago de los estudiantes
+- Supervisión general de la plataforma
 
-## Laravel Sponsors
+## Tecnologías Utilizadas
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- **PHP 8.x** - Lenguaje de programación principal
+- **Laravel 10.x** - Framework PHP para el desarrollo del backend
+- **MySQL** - Sistema de gestión de base de datos
+- **Composer** - Gestor de dependencias de PHP
+- **JWT (JSON Web Tokens)** - Autenticación y autorización
+- **Eloquent ORM** - Mapeo objeto-relacional
+- **Laravel Sanctum** - Autenticación de API
+- **Swagger/OpenAPI** - Documentación de API
+- **PHPUnit** - Pruebas unitarias
 
-### Premium Partners
+## Requisitos Previos
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+- PHP 8.1 o superior
+- Composer instalado
+- MySQL/MariaDB
+- Git
 
-## Contributing
+## Instalación y Configuración
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 1. Clonar el Repositorio
 
-## Code of Conduct
+```bash
+git clone https://github.com/tu-usuario/backend-imaf.git
+cd backend-imaf
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 2. Instalar Dependencias
 
-## Security Vulnerabilities
+```bash
+composer install
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 3. Configurar Variables de Entorno
 
-## License
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Edita el archivo `.env` y configura las siguientes variables:
+
+```env
+DB_DATABASE=imaf_db
+DB_USERNAME=root
+DB_PASSWORD=tu_contraseña
+
+JWT_SECRET=tu_jwt_secret_secreto
+```
+
+### 4. Configurar Base de Datos
+
+Crea una base de datos MySQL con el nombre configurado en `.env` y ejecuta las migraciones:
+
+```bash
+php artisan migrate
+```
+
+### 5. Ejecutar Seeders (Datos Iniciales)
+
+```bash
+php artisan db:seed
+```
+
+### 6. Iniciar el Servidor de Desarrollo
+
+```bash
+php artisan serve
+```
+
+El servidor estará disponible en `http://localhost:8000`
+
+## Endpoints Principales
+
+### Autenticación
+- `POST /api/auth/login` - Inicio de sesión
+- `POST /api/auth/register` - Registro de usuarios
+- `POST /api/auth/logout` - Cierre de sesión
+
+### Administración
+- `GET /api/admin/courses` - Listar cursos
+- `POST /api/admin/courses` - Crear curso
+- `PUT /api/admin/courses/{id}` - Actualizar curso
+- `GET /api/admin/users` - Listar usuarios
+- `POST /api/admin/instructors` - Crear instructor
+
+### Estudiantes
+- `GET /api/student/courses` - Cursos disponibles
+- `POST /api/student/enroll/{courseId}` - Inscribirse en curso
+- `POST /api/student/payment` - Subir comprobante de pago
+
+### Instructores
+- `GET /api/instructor/my-courses` - Mis cursos
+- `GET /api/instructor/students/{courseId}` - Alumnos del curso
+- `PUT /api/instructor/student-status/{studentId}` - Actualizar estado
+
+## Estructura del Proyecto
+
+```
+backend-imaf/
+├── app/
+│   ├── Http/Controllers/     # Controladores
+│   ├── Models/              # Modelos Eloquent
+│   ├── Http/Middleware/     # Middleware
+│   └── Jobs/                # Trabajos en cola
+├── database/
+│   ├── migrations/          # Migraciones de BD
+│   └── seeders/             # Datos de prueba
+├── routes/
+│   └── api.php              # Rutas de la API
+├── tests/                   # Pruebas unitarias
+└── .env                     # Variables de entorno
+```
