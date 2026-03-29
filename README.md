@@ -1,14 +1,10 @@
 # Backend IMAF - Sistema de Gestión de Cursos y Estudiantes
 
-## Nombre del Proyecto
+## Descripción del Proyecto
 
-**Backend IMAF** - Sistema de gestión de cursos y estudiantes para el Instituto de la Mujer, Atención a la Familia y Formación para el Trabajo (IMAF).
+Sistema de gestión de cursos y estudiantes para el **Instituto de la Mujer, Atención a la Familia y Formación para el Trabajo (IMAF)**. Desarrollado por un equipo de estudiantes de la UPTYAB como parte de un proyecto sociotecnológico.
 
-Este proyecto es desarrollado por un equipo de estudiantes de la UPTYAB como parte de un proyecto sociotecnológico.
-
-## Descripción
-
-Este repositorio contiene el backend o lado servidor del sistema de gestión de cursos y estudiantes del IMAF. El sistema proporciona una plataforma completa para la administración de cursos educativos, gestión de usuarios y seguimiento del progreso académico.
+Este repositorio contiene el backend o lado servidor del sistema de gestión de cursos y estudiantes del IMAF. El sistema proporciona una plataforma completa para la administración de cursos educativos, gestión de usuarios y seguimiento del progreso académico, así como la gestión de inscripción, seguimiento y administración de cursos impartidos por el instituto, facilitando la interacción entre administradores, instructores y estudiantes.
 
 ### Roles del Sistema
 
@@ -20,7 +16,7 @@ El sistema cuenta con tres roles principales:
 - Solo puede cursar los cursos después de realizar el pago correspondiente
 - Accede al contenido educativo y seguimiento de su progreso
 
-#### 👨‍🏫 **Instructor**
+#### 👨‍🏫 **Instructor** (profesor)
 - Profesor a cargo de los cursos
 - Gestiona a los alumnos inscritos en sus cursos
 - Define y registra el estado de aprobación de los estudiantes
