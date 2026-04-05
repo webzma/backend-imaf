@@ -16,6 +16,8 @@ class Estudiante extends Model
         'genero',
         'fecha_inscripcion',
         'estado',
+        'estado_pago',
+        'estado_aprobacion_curso',
     ];
 
     protected function casts(): array
