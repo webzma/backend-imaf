@@ -18,35 +18,35 @@ class ProfesorController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name'             => 'required|string|max:255',
-            'email'            => 'required|email|unique:users',
-            'password'         => 'required|string|min:8',
-            'cedula'           => 'required|string|unique:profesores,cedula',
-            'telefono'         => 'nullable|string|max:20',
-            'especialidad'     => 'nullable|string|max:255',
-            'titulo'           => 'nullable|in:licenciatura,maestria,doctorado',
-            'departamento'     => 'nullable|string|max:255',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|string|min:8',
+            'cedula' => 'required|string|unique:profesores,cedula',
+            'telefono' => 'nullable|string|max:20',
+            'especialidad' => 'nullable|string|max:255',
+            'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
+            'departamento' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
-            'genero'           => 'nullable|in:masculino,femenino,otro',
+            'genero' => 'nullable|in:masculino,femenino,otro',
         ]);
 
         $profesor = DB::transaction(function () use ($request) {
             $user = User::create([
-                'name'     => $request->name,
-                'email'    => $request->email,
+                'name' => $request->name,
+                'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'role'     => 'profesor',
+                'role' => 'profesor',
             ]);
 
             return Profesor::create([
-                'user_id'          => $user->id,
-                'cedula'           => $request->cedula,
-                'telefono'         => $request->telefono,
-                'especialidad'     => $request->especialidad,
-                'titulo'           => $request->titulo,
-                'departamento'     => $request->departamento,
+                'user_id' => $user->id,
+                'cedula' => $request->cedula,
+                'telefono' => $request->telefono,
+                'especialidad' => $request->especialidad,
+                'titulo' => $request->titulo,
+                'departamento' => $request->departamento,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
-                'genero'           => $request->genero,
+                'genero' => $request->genero,
             ]);
         });
 
@@ -65,13 +65,13 @@ class ProfesorController extends Controller
         $profesor = Profesor::findOrFail($id);
 
         $data = $request->validate([
-            'cedula'           => 'sometimes|string|unique:profesores,cedula,' . $id,
-            'telefono'         => 'nullable|string|max:20',
-            'especialidad'     => 'nullable|string|max:255',
-            'titulo'           => 'nullable|in:licenciatura,maestria,doctorado',
-            'departamento'     => 'nullable|string|max:255',
+            'cedula' => 'sometimes|string|unique:profesores,cedula,'.$id,
+            'telefono' => 'nullable|string|max:20',
+            'especialidad' => 'nullable|string|max:255',
+            'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
+            'departamento' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
-            'genero'           => 'nullable|in:masculino,femenino,otro',
+            'genero' => 'nullable|in:masculino,femenino,otro',
         ]);
 
         $profesor->update($data);

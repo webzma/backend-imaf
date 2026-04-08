@@ -13,37 +13,37 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'name'             => 'required|string|max:255',
-            'email'            => 'required|email|unique:users',
-            'password'         => 'required|string|min:8|confirmed',
-            'cedula'           => 'required|string|unique:estudiantes,cedula',
-            'telefono'         => 'required|string|max:20',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|string|min:8|confirmed',
+            'cedula' => 'required|string|unique:estudiantes,cedula',
+            'telefono' => 'required|string|max:20',
             'fecha_nacimiento' => 'required|date',
-            'genero'           => 'required|in:masculino,femenino,otro',
+            'genero' => 'required|in:masculino,femenino,otro',
         ]);
 
         $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
+            'name' => $request->name,
+            'email' => $request->email,
             'password' => $request->password,
-            'role'     => 'estudiante',
+            'role' => 'estudiante',
         ]);
 
         Estudiante::create([
-            'user_id'          => $user->id,
-            'nombre'           => $request->name,
-            'cedula'           => $request->cedula,
-            'telefono'         => $request->telefono,
+            'user_id' => $user->id,
+            'nombre' => $request->name,
+            'cedula' => $request->cedula,
+            'telefono' => $request->telefono,
             'fecha_nacimiento' => $request->fecha_nacimiento,
-            'genero'           => $request->genero,
-            'fecha_inscripcion'=> now()->toDateString(),
-            'estado'           => 'activo',
+            'genero' => $request->genero,
+            'fecha_inscripcion' => now()->toDateString(),
+            'estado' => 'activo',
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user'  => $user->load('estudiante'),
+            'user' => $user->load('estudiante'),
             'token' => $token,
         ], 201);
     }
@@ -51,7 +51,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email'    => 'required|email',
+            'email' => 'required|email',
             'password' => 'required|string',
         ]);
 
@@ -66,7 +66,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user'  => $user,
+            'user' => $user,
             'token' => $token,
         ]);
     }

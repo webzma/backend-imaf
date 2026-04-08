@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\EstudianteController;
+use App\Http\Controllers\PagoController;
 use App\Http\Controllers\ProfesorController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,7 +13,6 @@ Route::post('/login', [AuthController::class, 'login']);
 
 // Rutas protegidas (requieren token)
 Route::middleware('auth:sanctum')->group(function () {
-
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
@@ -21,6 +21,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('estudiantes', EstudianteController::class);
         Route::apiResource('profesores', ProfesorController::class);
         Route::apiResource('cursos', CursoController::class);
+        Route::get('pagos', [PagoController::class, 'index']);
+        Route::put('pagos/{id}', [PagoController::class, 'update']);
+        Route::delete('pagos/{id}', [PagoController::class, 'destroy']);
     });
 
     // Profesor y admin
@@ -42,5 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('cursos/{id}', [CursoController::class, 'show']);
         Route::get('perfil', [EstudianteController::class, 'showMe']);
         Route::put('perfil', [EstudianteController::class, 'updateMe']);
+        Route::post('pagos', [PagoController::class, 'store']);
+        Route::get('pagos', [PagoController::class, 'misPagos']);
     });
 });
