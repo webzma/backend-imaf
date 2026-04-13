@@ -80,6 +80,14 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return response()->json($request->user());
+        $user = $request->user();
+
+        $profile = match ($user->role) {
+            'estudiante' => $user->load('estudiante.curso'),
+            'profesor'   => $user->load('profesor.cursos'),
+            default      => $user,
+        };
+
+        return response()->json($profile);
     }
 }

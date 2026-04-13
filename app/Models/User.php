@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Pago;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -56,5 +57,10 @@ class User extends Authenticatable
     public function profesor()
     {
         return $this->hasOne(Profesor::class);
+    }
+
+    public function pagos()
+    {
+        return $this->hasMany(Pago::class);
     }
 }

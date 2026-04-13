@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 use App\Models\Profesor;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Curso extends Model
 {
+    use SoftDeletes;
     protected $fillable = [
         'profesor_id',
         'nombre',
