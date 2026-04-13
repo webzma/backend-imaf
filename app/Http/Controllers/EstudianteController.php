@@ -13,9 +13,31 @@ use Illuminate\Support\Facades\Hash;
 
 class EstudianteController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(Estudiante::with('user', 'curso')->get());
+        $query = Estudiante::with('user', 'curso');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('nombre', 'like', "%{$search}%")
+                  ->orWhere('cedula', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->estado);
+        }
+
+        if ($request->filled('curso_id')) {
+            $query->where('curso_id', $request->curso_id);
+        }
+
+        if ($request->filled('estado_pago')) {
+            $query->where('estado_pago', $request->estado_pago);
+        }
+
+        return response()->json($query->paginate(20));
     }
 
     public function store(Request $request)

@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CertificadoController;
 use App\Http\Controllers\CursoController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EstudianteController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PagoController;
@@ -9,8 +11,10 @@ use App\Http\Controllers\ProfesorController;
 use Illuminate\Support\Facades\Route;
 
 // Rutas públicas
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::middleware('throttle:10,1')->group(function () {
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+});
 
 // Rutas protegidas (requieren token)
 Route::middleware('auth:sanctum')->group(function () {
@@ -19,6 +23,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Solo admin
     Route::middleware('role:admin')->prefix('admin')->group(function () {
+        Route::get('dashboard', [DashboardController::class, 'index']);
         Route::apiResource('estudiantes', EstudianteController::class);
         Route::patch('estudiantes/{id}/estado-pago', [EstudianteController::class, 'updateEstadoPago']);
         Route::get('notificaciones', [NotificationController::class, 'index']);
@@ -34,6 +39,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('pagos', [PagoController::class, 'index']);
         Route::put('pagos/{id}', [PagoController::class, 'update']);
         Route::delete('pagos/{id}', [PagoController::class, 'destroy']);
+
+        // Certificados
+        Route::get('estudiantes/{id}/certificado', [CertificadoController::class, 'download']);
     });
 
     // Profesor y admin

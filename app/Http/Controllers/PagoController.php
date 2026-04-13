@@ -6,20 +6,27 @@ use App\Models\Curso;
 use App\Models\Pago;
 use App\Models\User;
 use App\Notifications\GenericNotification;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class PagoController extends Controller
 {
-    // Estudiante: ver sus propios pagos
+    // Estudiante: ver sus propios pagos (con historial completo incluyendo rechazados)
     public function studentIndex(Request $request)
     {
-        $pagos = Pago::with('curso')
+        $query = Pago::with('curso')
             ->where('user_id', $request->user()->id)
-            ->latest()
-            ->get();
+            ->latest();
 
-        return response()->json($pagos);
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->estado);
+        }
+
+        if ($request->filled('curso_id')) {
+            $query->where('curso_id', $request->curso_id);
+        }
+
+        return response()->json($query->paginate(10));
     }
 
     // Estudiante: enviar comprobante de pago para inscribirse
@@ -47,16 +54,17 @@ class PagoController extends Controller
             ], 422);
         }
 
-        $file = $request->file('comprobante');
-        $filename = time() . '_' . $file->getClientOriginalName();
-        $file->storeAs('public/comprobantes', $filename);
+        $uploadedFile = Cloudinary::upload(
+            $request->file('comprobante')->getRealPath(),
+            ['folder' => 'imaf/comprobantes']
+        );
 
         $pago = Pago::create([
             'user_id'      => $user->id,
             'curso_id'     => $request->curso_id,
             'referencia'   => $request->referencia,
             'banco_origen' => $request->banco_origen,
-            'comprobante'  => $filename,
+            'comprobante'  => $uploadedFile->getPublicId(),
             'estado'       => 'pendiente',
         ]);
 
@@ -74,44 +82,31 @@ class PagoController extends Controller
     }
 
     // Admin: listar todos los pagos
-    public function index()
+    public function index(Request $request)
     {
-        $pagos = Pago::with(['estudiante.user', 'curso'])
-            ->latest()
-            ->get();
+        $query = Pago::with(['user', 'curso'])->latest();
 
-        $formattedPagos = $pagos->map(function ($pago) {
-            $estudiante = $pago->estudiante;
-            $user = $estudiante ? $estudiante->user : null;
-            $curso = $pago->curso;
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->estado);
+        }
 
-            return [
-                'id'             => $pago->id,
-                'referencia'     => $pago->referencia,
-                'banco_origen'   => $pago->banco_origen,
-                'comprobante'    => $pago->comprobante,
-                'comprobante_url'=> $pago->comprobante_url,
-                'estado'         => $pago->estado,
-                'nota_admin'     => $pago->nota_admin,
-                'created_at'     => $pago->created_at,
-                'estudiante'     => $estudiante ? [
-                    'id'     => $estudiante->id,
-                    'nombre' => $estudiante->nombre,
-                    'cedula' => $estudiante->cedula,
-                    'user'   => $user ? [
-                        'name'  => $user->name,
-                        'email' => $user->email,
-                    ] : null,
-                ] : null,
-                'curso' => $curso ? [
-                    'id'     => $pago->getRawOriginal('curso_id'),
-                    'nombre' => $curso->nombre,
-                    'codigo' => $curso->codigo,
-                ] : null,
-            ];
-        });
+        if ($request->filled('curso_id')) {
+            $query->where('curso_id', $request->curso_id);
+        }
 
-        return response()->json($formattedPagos);
+        if ($request->filled('fecha_desde')) {
+            $query->whereDate('created_at', '>=', $request->fecha_desde);
+        }
+
+        if ($request->filled('fecha_hasta')) {
+            $query->whereDate('created_at', '<=', $request->fecha_hasta);
+        }
+
+        $pagos = $query->paginate(20);
+
+        $pagos->getCollection()->transform(fn ($pago) => $this->formatPago($pago));
+
+        return response()->json($pagos);
     }
 
     // Admin: aprobar o rechazar pago
@@ -122,41 +117,18 @@ class PagoController extends Controller
             'nota_admin' => 'nullable|string|max:500',
         ]);
 
-        $pago = Pago::with(['estudiante.user', 'curso'])->findOrFail($id);
+        $pago = Pago::with(['user', 'curso'])->findOrFail($id);
 
         $pago->update([
             'estado'     => $request->estado,
             'nota_admin' => $request->nota_admin,
         ]);
 
-        $pago->load(['estudiante.user', 'curso']);
+        $pago->refresh();
 
         return response()->json([
             'message' => "Pago {$request->estado} con éxito.",
-            'pago'    => [
-                'id'             => $pago->id,
-                'referencia'     => $pago->referencia,
-                'banco_origen'   => $pago->banco_origen,
-                'comprobante'    => $pago->comprobante,
-                'comprobante_url'=> $pago->comprobante_url,
-                'estado'         => $pago->estado,
-                'nota_admin'     => $pago->nota_admin,
-                'created_at'     => $pago->created_at,
-                'estudiante'     => $pago->estudiante ? [
-                    'id'     => $pago->estudiante->id,
-                    'nombre' => $pago->estudiante->nombre,
-                    'cedula' => $pago->estudiante->cedula,
-                    'user'   => $pago->estudiante->user ? [
-                        'name'  => $pago->estudiante->user->name,
-                        'email' => $pago->estudiante->user->email,
-                    ] : null,
-                ] : null,
-                'curso' => $pago->curso ? [
-                    'id'     => $pago->getRawOriginal('curso_id'),
-                    'nombre' => $pago->curso->nombre,
-                    'codigo' => $pago->curso->codigo,
-                ] : null,
-            ],
+            'pago'    => $this->formatPago($pago),
         ]);
     }
 
@@ -164,9 +136,36 @@ class PagoController extends Controller
     public function destroy(string $id)
     {
         $pago = Pago::findOrFail($id);
-        Storage::disk('public')->delete('comprobantes/' . $pago->comprobante);
+        Cloudinary::destroy($pago->comprobante);
         $pago->delete();
 
         return response()->json(['message' => 'Pago eliminado.']);
+    }
+
+    private function formatPago(Pago $pago): array
+    {
+        $user  = $pago->user;
+        $curso = $pago->curso;
+
+        return [
+            'id'              => $pago->id,
+            'referencia'      => $pago->referencia,
+            'banco_origen'    => $pago->banco_origen,
+            'comprobante'     => $pago->comprobante,
+            'comprobante_url' => $pago->comprobante_url,
+            'estado'          => $pago->estado,
+            'nota_admin'      => $pago->nota_admin,
+            'created_at'      => $pago->created_at,
+            'user'            => $user ? [
+                'id'    => $user->id,
+                'name'  => $user->name,
+                'email' => $user->email,
+            ] : null,
+            'curso'           => $curso ? [
+                'id'     => $pago->getRawOriginal('curso_id'),
+                'nombre' => $curso->nombre,
+                'codigo' => $curso->codigo,
+            ] : null,
+        ];
     }
 }

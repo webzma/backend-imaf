@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Estudiante extends Model
 {
+    use SoftDeletes;
     protected $fillable = [
         'user_id',
         'curso_id',
@@ -38,8 +40,4 @@ class Estudiante extends Model
         return $this->belongsTo(Curso::class);
     }
 
-    public function pagos()
-    {
-        return $this->hasMany(Pago::class);
-    }
 }

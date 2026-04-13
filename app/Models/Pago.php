@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Pago extends Model
 {
+    use SoftDeletes;
     protected $fillable = [
         'user_id',
         'curso_id',
@@ -21,7 +23,7 @@ class Pago extends Model
 
     public function getComprobanteUrlAttribute(): string
     {
-        return Storage::url('comprobantes/' . $this->comprobante);
+        return Cloudinary::getUrl($this->comprobante);
     }
 
     public function user()
