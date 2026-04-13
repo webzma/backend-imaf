@@ -33,6 +33,6 @@ class Profesor extends Model
 
     public function cursos()
     {
-        return $this->hasMany(Curso::class, 'profesor_id', 'user_id');
+        return $this->hasMany(Curso::class, 'profesor_id');
     }
 }

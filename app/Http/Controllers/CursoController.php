@@ -16,7 +16,7 @@ class CursoController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'profesor_id'  => ['required', Rule::exists('users', 'id')->where('role', 'profesor')],
+            'profesor_id'  => ['required', Rule::exists('profesores', 'id')],
             'nombre'       => 'required|string|max:255',
             'limite_cupo'  => 'required|integer|min:1',
             'fecha_inicio' => 'nullable|date',
@@ -45,7 +45,7 @@ class CursoController extends Controller
         $curso = Curso::findOrFail($id);
 
         $data = $request->validate([
-            'profesor_id'  => ['sometimes', Rule::exists('users', 'id')->where('role', 'profesor')],
+            'profesor_id'  => ['sometimes', Rule::exists('profesores', 'id')],
             'nombre'       => 'sometimes|string|max:255',
             'limite_cupo'  => 'sometimes|integer|min:1',
             'fecha_inicio' => 'nullable|date',

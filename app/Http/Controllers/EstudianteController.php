@@ -184,7 +184,7 @@ class EstudianteController extends Controller
         $estudiante = Estudiante::with('user', 'curso')->findOrFail($id);
 
         $curso = $estudiante->curso;
-        if (! $curso || (int) $curso->profesor_id !== (int) Auth::id()) {
+        if (! $curso || (int) $curso->profesor->user_id !== (int) Auth::id()) {
             return response()->json(['message' => 'No autorizado para este curso.'], 403);
         }
 

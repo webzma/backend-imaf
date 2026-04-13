@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use App\Models\Profesor;
 
 class Curso extends Model
 {
@@ -44,7 +45,7 @@ class Curso extends Model
 
     public function profesor()
     {
-        return $this->belongsTo(User::class, 'profesor_id');
+        return $this->belongsTo(Profesor::class, 'profesor_id');
     }
 
     public function estudiantes()
