@@ -14,7 +14,8 @@ class DatabaseNotificationResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $data = is_array($this->data) ? $this->data : [];
+        $data = $this->data ?? [];
+        $data = is_array($data) ? $data : [];
 
         return [
             'id' => $this->id,
