@@ -10,7 +10,7 @@ class CursoController extends Controller
 {
     public function index()
     {
-        return response()->json(Curso::with('profesor', 'estudiantes.user')->get());
+        return response()->json(Curso::with('profesor.user', 'estudiantes.user')->get());
     }
 
     public function store(Request $request)
@@ -35,7 +35,7 @@ class CursoController extends Controller
 
     public function show(string $id)
     {
-        $curso = Curso::with('profesor', 'estudiantes.user')->findOrFail($id);
+        $curso = Curso::with('profesor.user', 'estudiantes.user')->findOrFail($id);
 
         return response()->json($curso);
     }

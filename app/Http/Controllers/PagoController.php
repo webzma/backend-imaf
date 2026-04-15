@@ -84,7 +84,7 @@ class PagoController extends Controller
     // Admin: listar todos los pagos
     public function index(Request $request)
     {
-        $query = Pago::with(['user', 'curso'])->latest();
+        $query = Pago::with(['user', 'curso', 'estudiante'])->latest();
 
         if ($request->filled('estado')) {
             $query->where('estado', $request->estado);
@@ -117,7 +117,7 @@ class PagoController extends Controller
             'nota_admin' => 'nullable|string|max:500',
         ]);
 
-        $pago = Pago::with(['user', 'curso'])->findOrFail($id);
+        $pago = Pago::with(['user', 'curso', 'estudiante'])->findOrFail($id);
 
         $pago->update([
             'estado'     => $request->estado,
@@ -144,8 +144,9 @@ class PagoController extends Controller
 
     private function formatPago(Pago $pago): array
     {
-        $user  = $pago->user;
-        $curso = $pago->curso;
+        $user       = $pago->user;
+        $curso      = $pago->curso;
+        $estudiante = $pago->estudiante;
 
         return [
             'id'              => $pago->id,
@@ -156,10 +157,14 @@ class PagoController extends Controller
             'estado'          => $pago->estado,
             'nota_admin'      => $pago->nota_admin,
             'created_at'      => $pago->created_at,
-            'user'            => $user ? [
-                'id'    => $user->id,
-                'name'  => $user->name,
-                'email' => $user->email,
+            'estudiante'      => $estudiante ? [
+                'id'     => $estudiante->id,
+                'nombre' => $estudiante->nombre,
+                'cedula' => $estudiante->cedula,
+                'user'   => $user ? [
+                    'name'  => $user->name,
+                    'email' => $user->email,
+                ] : null,
             ] : null,
             'curso'           => $curso ? [
                 'id'     => $pago->getRawOriginal('curso_id'),
