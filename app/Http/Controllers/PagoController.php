@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Curso;
+use App\Models\Estudiante;
 use App\Models\Pago;
 use App\Models\User;
 use App\Notifications\GenericNotification;
@@ -123,6 +124,23 @@ class PagoController extends Controller
             'estado'     => $request->estado,
             'nota_admin' => $request->nota_admin,
         ]);
+
+        // Actualizar el Estudiante según la decisión
+        $estudiante = Estudiante::where('user_id', $pago->user_id)->first();
+
+        if ($estudiante) {
+            if ($request->estado === 'aprobado') {
+                $estudiante->update([
+                    'curso_id'    => $pago->curso_id,
+                    'estado_pago' => 'aprobado',
+                    'estado'      => 'activo',
+                ]);
+            } elseif ($request->estado === 'rechazado') {
+                $estudiante->update([
+                    'estado_pago' => 'reprobado',
+                ]);
+            }
+        }
 
         $pago->refresh();
 
