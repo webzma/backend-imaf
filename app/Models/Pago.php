@@ -21,8 +21,12 @@ class Pago extends Model
 
     protected $appends = ['comprobante_url'];
 
-    public function getComprobanteUrlAttribute(): string
+    public function getComprobanteUrlAttribute(): ?string
     {
+        if (empty($this->comprobante)) {
+            return null;
+        }
+
         return Cloudinary::getUrl($this->comprobante);
     }
 
