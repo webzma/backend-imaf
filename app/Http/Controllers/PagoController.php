@@ -35,7 +35,7 @@ class PagoController extends Controller
         $request->validate([
             'curso_id'     => 'required|exists:cursos,id',
             'referencia'   => 'required|string|max:100',
-            'banco_origen' => 'required|string|max:100',
+            'banco_origen' => 'nullable|string|max:100',
             'comprobante'  => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
