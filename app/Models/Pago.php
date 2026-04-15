@@ -27,7 +27,7 @@ class Pago extends Model
             return null;
         }
 
-        return Cloudinary::getUrl($this->comprobante);
+        return Cloudinary::image($this->comprobante)->toUrl();
     }
 
     public function user()
