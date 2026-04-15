@@ -54,7 +54,7 @@ class PagoController extends Controller
             ], 422);
         }
 
-        $uploadedFile = Cloudinary::upload(
+        $uploadedFile = Cloudinary::uploadApi()->upload(
             $request->file('comprobante')->getRealPath(),
             ['folder' => 'imaf/comprobantes']
         );
@@ -64,7 +64,7 @@ class PagoController extends Controller
             'curso_id'     => $request->curso_id,
             'referencia'   => $request->referencia,
             'banco_origen' => $request->banco_origen,
-            'comprobante'  => $uploadedFile->getPublicId(),
+            'comprobante'  => $uploadedFile['public_id'],
             'estado'       => 'pendiente',
         ]);
 
@@ -136,7 +136,7 @@ class PagoController extends Controller
     public function destroy(string $id)
     {
         $pago = Pago::findOrFail($id);
-        Cloudinary::destroy($pago->comprobante);
+        Cloudinary::uploadApi()->destroy($pago->comprobante);
         $pago->delete();
 
         return response()->json(['message' => 'Pago eliminado.']);
