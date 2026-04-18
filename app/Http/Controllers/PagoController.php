@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Notifications\GenericNotification;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PagoController extends Controller
 {
@@ -42,6 +43,12 @@ class PagoController extends Controller
 
         $user = $request->user();
         $curso = Curso::findOrFail($request->curso_id);
+
+        if ($curso->cupos_restantes <= 0) {
+            return response()->json([
+                'message' => 'El curso no tiene cupos disponibles.',
+            ], 422);
+        }
 
         // No permitir doble envío si ya hay un pago pendiente o aprobado
         $existe = Pago::where('user_id', $user->id)
@@ -120,26 +127,46 @@ class PagoController extends Controller
 
         $pago = Pago::with(['user', 'curso', 'estudiante'])->findOrFail($id);
 
-        $pago->update([
-            'estado'     => $request->estado,
-            'nota_admin' => $request->nota_admin,
-        ]);
+        $cupoAgotado = false;
 
-        // Actualizar el Estudiante según la decisión
-        $estudiante = Estudiante::where('user_id', $pago->user_id)->first();
+        DB::transaction(function () use ($pago, $request, &$cupoAgotado) {
+            // Bloquear el curso para evitar aprobaciones simultáneas que excedan el cupo
+            $curso = Curso::lockForUpdate()->findOrFail($pago->curso_id);
 
-        if ($estudiante) {
             if ($request->estado === 'aprobado') {
-                $estudiante->update([
-                    'curso_id'    => $pago->curso_id,
-                    'estado_pago' => 'aprobado',
-                    'estado'      => 'activo',
-                ]);
-            } elseif ($request->estado === 'rechazado') {
-                $estudiante->update([
-                    'estado_pago' => 'reprobado',
-                ]);
+                $ocupados = Estudiante::where('curso_id', $curso->id)->count();
+                if ($ocupados >= $curso->limite_cupo) {
+                    $cupoAgotado = true;
+                    return;
+                }
             }
+
+            $pago->update([
+                'estado'     => $request->estado,
+                'nota_admin' => $request->nota_admin,
+            ]);
+
+            $estudiante = Estudiante::where('user_id', $pago->user_id)->first();
+
+            if ($estudiante) {
+                if ($request->estado === 'aprobado') {
+                    $estudiante->update([
+                        'curso_id'    => $pago->curso_id,
+                        'estado_pago' => 'aprobado',
+                        'estado'      => 'activo',
+                    ]);
+                } elseif ($request->estado === 'rechazado') {
+                    $estudiante->update([
+                        'estado_pago' => 'reprobado',
+                    ]);
+                }
+            }
+        });
+
+        if ($cupoAgotado) {
+            return response()->json([
+                'message' => 'No se puede aprobar: el curso ya no tiene cupos disponibles.',
+            ], 422);
         }
 
         $pago->refresh();
@@ -155,7 +182,7 @@ class PagoController extends Controller
     {
         $pago = Pago::findOrFail($id);
         Cloudinary::uploadApi()->destroy($pago->comprobante);
-        $pago->delete();
+        $pago->forceDelete();
 
         return response()->json(['message' => 'Pago eliminado.']);
     }

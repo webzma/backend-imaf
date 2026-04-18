@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Estudiante;
 use App\Models\User;
 use App\Notifications\SolicitudCursoProcesada;
-use App\Notifications\SolicitudPagoRecibida;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -88,6 +87,48 @@ class EstudianteController extends Controller
         return response()->json($estudiante);
     }
 
+    public function miCurso()
+    {
+        $estudiante = Estudiante::with('curso.profesor.user')
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        if (! $estudiante->curso_id || ! $estudiante->curso) {
+            return response()->json([
+                'message' => 'No estás inscrito en ningún curso.',
+            ], 404);
+        }
+
+        $curso    = $estudiante->curso;
+        $profesor = $curso->profesor;
+
+        return response()->json([
+            'curso' => [
+                'id'                     => $curso->id,
+                'codigo'                 => $curso->codigo,
+                'nombre'                 => $curso->nombre,
+                'descripcion'            => $curso->descripcion,
+                'requisitos'             => $curso->requisitos,
+                'precio'                 => $curso->precio,
+                'fecha_inicio'           => $curso->fecha_inicio,
+                'fecha_fin'              => $curso->fecha_fin,
+                'estado'                 => $curso->estado,
+                'limite_cupo'            => $curso->limite_cupo,
+                'cupos_restantes'        => $curso->cupos_restantes,
+                'whatsapp_url'           => $curso->whatsapp_url,
+                'profesor'               => $profesor ? [
+                    'id'           => $profesor->id,
+                    'nombre'       => $profesor->user?->name,
+                    'especialidad' => $profesor->especialidad,
+                    'titulo'       => $profesor->titulo,
+                    'departamento' => $profesor->departamento,
+                ] : null,
+            ],
+            'estado_pago'             => $estudiante->estado_pago,
+            'estado_aprobacion_curso' => $estudiante->estado_aprobacion_curso,
+        ]);
+    }
+
     public function updateMe(Request $request)
     {
         $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
@@ -100,48 +141,9 @@ class EstudianteController extends Controller
         ]);
 
         $estudiante->update($data);
+        $estudiante->refresh();
 
         return response()->json($estudiante->load('user', 'curso'));
-    }
-
-    /**
-     * Estudiante: envía solicitud de revisión de pago; notifica a todos los administradores.
-     */
-    public function solicitarPagoCurso(string $cursoId)
-    {
-        $estudiante = Estudiante::with(['user', 'curso'])
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
-
-        if ((int) $estudiante->curso_id !== (int) $cursoId) {
-            return response()->json([
-                'message' => 'No estás inscrito en este curso o el curso no coincide.',
-            ], 422);
-        }
-
-        if ($estudiante->estado_pago === 'aprobado') {
-            return response()->json([
-                'message' => 'Tu pago para este curso ya está aprobado.',
-            ], 422);
-        }
-
-        $curso = $estudiante->curso;
-        if (! $curso || ! $estudiante->user) {
-            return response()->json(['message' => 'Datos del curso incompletos.'], 422);
-        }
-
-        $notification = new SolicitudPagoRecibida(
-            nombreEstudiante: $estudiante->user->name,
-            nombreCurso: $curso->nombre,
-            cursoId: (int) $curso->id,
-            estudianteId: (int) $estudiante->id,
-        );
-
-        User::where('role', 'admin')->get()->each(fn (User $admin) => $admin->notify($notification));
-
-        return response()->json([
-            'message' => 'Solicitud enviada. Un administrador revisará tu pago.',
-        ], 202);
     }
 
     public function show(string $id)
@@ -203,10 +205,10 @@ class EstudianteController extends Controller
      */
     public function updateAprobacionCurso(Request $request, string $id)
     {
-        $estudiante = Estudiante::with('user', 'curso')->findOrFail($id);
+        $estudiante = Estudiante::with('user', 'curso.profesor')->findOrFail($id);
 
         $curso = $estudiante->curso;
-        if (! $curso || (int) $curso->profesor->user_id !== (int) Auth::id()) {
+        if (! $curso || ! $curso->profesor || (int) $curso->profesor->user_id !== (int) Auth::id()) {
             return response()->json(['message' => 'No autorizado para este curso.'], 403);
         }
 
