@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Profesor;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -63,6 +64,10 @@ class ProfesorController extends Controller
     public function update(Request $request, string $id)
     {
         $profesor = Profesor::findOrFail($id);
+
+        if ((int) $profesor->user_id !== (int) Auth::id()) {
+            return response()->json(['message' => 'No autorizado.'], 403);
+        }
 
         $data = $request->validate([
             'cedula' => 'sometimes|string|unique:profesores,cedula,'.$id,

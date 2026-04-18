@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Estudiante;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -22,28 +23,32 @@ class AuthController extends Controller
             'genero' => 'required|in:masculino,femenino,otro',
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => $request->password,
-            'role' => 'estudiante',
-        ]);
+        $user = DB::transaction(function () use ($request) {
+            $user = User::create([
+                'name'     => $request->name,
+                'email'    => $request->email,
+                'password' => $request->password,
+                'role'     => 'estudiante',
+            ]);
 
-        Estudiante::create([
-            'user_id' => $user->id,
-            'nombre' => $request->name,
-            'cedula' => $request->cedula,
-            'telefono' => $request->telefono,
-            'fecha_nacimiento' => $request->fecha_nacimiento,
-            'genero' => $request->genero,
-            'fecha_inscripcion' => now()->toDateString(),
-            'estado' => 'activo',
-        ]);
+            Estudiante::create([
+                'user_id'          => $user->id,
+                'nombre'           => $request->name,
+                'cedula'           => $request->cedula,
+                'telefono'         => $request->telefono,
+                'fecha_nacimiento' => $request->fecha_nacimiento,
+                'genero'           => $request->genero,
+                'fecha_inscripcion'=> now()->toDateString(),
+                'estado'           => 'activo',
+            ]);
+
+            return $user;
+        });
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user->load('estudiante'),
+            'user'  => $user->load('estudiante'),
             'token' => $token,
         ], 201);
     }

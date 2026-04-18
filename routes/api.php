@@ -62,7 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {
         Route::get('cursos', [CursoController::class, 'index']);
         Route::get('cursos/{id}', [CursoController::class, 'show']);
-        Route::post('cursos/{cursoId}/solicitar-pago', [EstudianteController::class, 'solicitarPagoCurso']);
+        Route::get('curso', [EstudianteController::class, 'miCurso']);
         Route::get('perfil', [EstudianteController::class, 'showMe']);
         Route::put('perfil', [EstudianteController::class, 'updateMe']);
         Route::get('notificaciones', [NotificationController::class, 'index']);
