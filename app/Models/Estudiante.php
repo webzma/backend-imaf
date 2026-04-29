@@ -14,6 +14,7 @@ class Estudiante extends Model
         'nombre',
         'cedula',
         'telefono',
+        'municipio',
         'fecha_nacimiento',
         'genero',
         'fecha_inscripcion',
