@@ -19,6 +19,7 @@ class AuthController extends Controller
             'password' => 'required|string|min:8|confirmed',
             'cedula' => 'required|string|unique:estudiantes,cedula',
             'telefono' => 'required|string|max:20',
+            'municipio' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'required|date',
             'genero' => 'required|in:masculino,femenino,otro',
         ]);
@@ -36,6 +37,7 @@ class AuthController extends Controller
                 'nombre'           => $request->name,
                 'cedula'           => $request->cedula,
                 'telefono'         => $request->telefono,
+                'municipio'        => $request->municipio,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
                 'genero'           => $request->genero,
                 'fecha_inscripcion'=> now()->toDateString(),
