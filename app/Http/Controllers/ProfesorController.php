@@ -24,6 +24,7 @@ class ProfesorController extends Controller
             'password' => 'required|string|min:8',
             'cedula' => 'required|string|unique:profesores,cedula',
             'telefono' => 'nullable|string|max:20',
+            'municipio' => 'nullable|string|max:255',
             'especialidad' => 'nullable|string|max:255',
             'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
             'departamento' => 'nullable|string|max:255',
@@ -43,6 +44,7 @@ class ProfesorController extends Controller
                 'user_id' => $user->id,
                 'cedula' => $request->cedula,
                 'telefono' => $request->telefono,
+                'municipio' => $request->municipio,
                 'especialidad' => $request->especialidad,
                 'titulo' => $request->titulo,
                 'departamento' => $request->departamento,
@@ -72,6 +74,7 @@ class ProfesorController extends Controller
         $data = $request->validate([
             'cedula' => 'sometimes|string|unique:profesores,cedula,'.$id,
             'telefono' => 'nullable|string|max:20',
+            'municipio' => 'nullable|string|max:255',
             'especialidad' => 'nullable|string|max:255',
             'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
             'departamento' => 'nullable|string|max:255',
