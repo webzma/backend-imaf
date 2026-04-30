@@ -19,7 +19,6 @@ class Profesor extends Model
         'especialidad',
         'titulo',
         'departamento',
-        'municipio',
         'fecha_nacimiento',
         'genero',
     ];

@@ -9,19 +9,22 @@ return new class() extends Migration
 {
     public function up(): void
     {
-        // 1. Convertir los valores actuales de profesor_id (user_id) al id real de profesores
+        // Convertir los valores actuales de profesor_id (user_id) al id real de profesores.
+        // Usa subquery en lugar de UPDATE…JOIN para compatibilidad con SQLite.
         DB::statement('
-            UPDATE cursos c
-            JOIN profesores p ON p.user_id = c.profesor_id
-            SET c.profesor_id = p.id
+            UPDATE cursos
+            SET profesor_id = (
+                SELECT p.id FROM profesores p WHERE p.user_id = cursos.profesor_id
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM profesores p WHERE p.user_id = cursos.profesor_id
+            )
         ');
 
-        // 2. Quitar el FK viejo que apuntaba a users.id
         Schema::table('cursos', function (Blueprint $table) {
             $table->dropForeign(['profesor_id']);
         });
 
-        // 3. Agregar el FK correcto apuntando a profesores.id
         Schema::table('cursos', function (Blueprint $table) {
             $table->foreign('profesor_id')
                 ->references('id')
@@ -32,16 +35,18 @@ return new class() extends Migration
 
     public function down(): void
     {
-        // Revertir FK a users.id
         Schema::table('cursos', function (Blueprint $table) {
             $table->dropForeign(['profesor_id']);
         });
 
-        // Reconvertir ids de profesores → user_id
         DB::statement('
-            UPDATE cursos c
-            JOIN profesores p ON p.id = c.profesor_id
-            SET c.profesor_id = p.user_id
+            UPDATE cursos
+            SET profesor_id = (
+                SELECT p.user_id FROM profesores p WHERE p.id = cursos.profesor_id
+            )
+            WHERE EXISTS (
+                SELECT 1 FROM profesores p WHERE p.id = cursos.profesor_id
+            )
         ');
 
         Schema::table('cursos', function (Blueprint $table) {
