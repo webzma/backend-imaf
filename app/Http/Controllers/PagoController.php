@@ -35,10 +35,10 @@ class PagoController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'curso_id'     => 'required|exists:cursos,id',
-            'referencia'   => 'required|string|max:100',
+            'curso_id' => 'required|exists:cursos,id',
+            'referencia' => 'required|string|max:100',
             'banco_origen' => 'nullable|string|max:100',
-            'comprobante'  => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'comprobante' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
         $user = $request->user();
@@ -68,12 +68,12 @@ class PagoController extends Controller
         );
 
         $pago = Pago::create([
-            'user_id'      => $user->id,
-            'curso_id'     => $request->curso_id,
-            'referencia'   => $request->referencia,
+            'user_id' => $user->id,
+            'curso_id' => $request->curso_id,
+            'referencia' => $request->referencia,
             'banco_origen' => $request->banco_origen,
-            'comprobante'  => $uploadedFile['public_id'],
-            'estado'       => 'pendiente',
+            'comprobante' => $uploadedFile['public_id'],
+            'estado' => 'pendiente',
         ]);
 
         // Notificar a los administradores
@@ -121,7 +121,7 @@ class PagoController extends Controller
     public function update(Request $request, string $id)
     {
         $request->validate([
-            'estado'     => 'required|in:aprobado,rechazado',
+            'estado' => 'required|in:aprobado,rechazado',
             'nota_admin' => 'nullable|string|max:500',
         ]);
 
@@ -137,12 +137,13 @@ class PagoController extends Controller
                 $ocupados = Estudiante::where('curso_id', $curso->id)->count();
                 if ($ocupados >= $curso->limite_cupo) {
                     $cupoAgotado = true;
+
                     return;
                 }
             }
 
             $pago->update([
-                'estado'     => $request->estado,
+                'estado' => $request->estado,
                 'nota_admin' => $request->nota_admin,
             ]);
 
@@ -151,9 +152,9 @@ class PagoController extends Controller
             if ($estudiante) {
                 if ($request->estado === 'aprobado') {
                     $estudiante->update([
-                        'curso_id'    => $pago->curso_id,
+                        'curso_id' => $pago->curso_id,
                         'estado_pago' => 'aprobado',
-                        'estado'      => 'activo',
+                        'estado' => 'activo',
                     ]);
                 } elseif ($request->estado === 'rechazado') {
                     $estudiante->update([
@@ -173,7 +174,7 @@ class PagoController extends Controller
 
         return response()->json([
             'message' => "Pago {$request->estado} con éxito.",
-            'pago'    => $this->formatPago($pago),
+            'pago' => $this->formatPago($pago),
         ]);
     }
 
@@ -189,30 +190,30 @@ class PagoController extends Controller
 
     private function formatPago(Pago $pago): array
     {
-        $user       = $pago->user;
-        $curso      = $pago->curso;
+        $user = $pago->user;
+        $curso = $pago->curso;
         $estudiante = $pago->estudiante;
 
         return [
-            'id'              => $pago->id,
-            'referencia'      => $pago->referencia,
-            'banco_origen'    => $pago->banco_origen,
-            'comprobante'     => $pago->comprobante,
+            'id' => $pago->id,
+            'referencia' => $pago->referencia,
+            'banco_origen' => $pago->banco_origen,
+            'comprobante' => $pago->comprobante,
             'comprobante_url' => $pago->comprobante_url,
-            'estado'          => $pago->estado,
-            'nota_admin'      => $pago->nota_admin,
-            'created_at'      => $pago->created_at,
-            'estudiante'      => $estudiante ? [
-                'id'     => $estudiante->id,
+            'estado' => $pago->estado,
+            'nota_admin' => $pago->nota_admin,
+            'created_at' => $pago->created_at,
+            'estudiante' => $estudiante ? [
+                'id' => $estudiante->id,
                 'nombre' => $estudiante->nombre,
                 'cedula' => $estudiante->cedula,
-                'user'   => $user ? [
-                    'name'  => $user->name,
+                'user' => $user ? [
+                    'name' => $user->name,
                     'email' => $user->email,
                 ] : null,
             ] : null,
-            'curso'           => $curso ? [
-                'id'     => $pago->getRawOriginal('curso_id'),
+            'curso' => $curso ? [
+                'id' => $pago->getRawOriginal('curso_id'),
                 'nombre' => $curso->nombre,
                 'codigo' => $curso->codigo,
             ] : null,

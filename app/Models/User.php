@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Pago;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;

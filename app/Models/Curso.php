@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Profesor;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
@@ -10,6 +9,7 @@ use Illuminate\Support\Str;
 class Curso extends Model
 {
     use SoftDeletes;
+
     protected $fillable = [
         'profesor_id',
         'nombre',
@@ -31,7 +31,7 @@ class Curso extends Model
 
         static::creating(function (Curso $curso) {
             do {
-                $codigo = 'CUR-' . strtoupper(Str::random(6));
+                $codigo = 'CUR-'.strtoupper(Str::random(6));
             } while (static::where('codigo', $codigo)->exists());
 
             $curso->codigo = $codigo;

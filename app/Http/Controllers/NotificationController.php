@@ -22,7 +22,7 @@ class NotificationController extends Controller
     public function unreadCount(Request $request)
     {
         return response()->json([
-            'unread_count' => $request->user()->unreadNotifications()->count()
+            'unread_count' => $request->user()->unreadNotifications()->count(),
         ]);
     }
 
@@ -52,7 +52,7 @@ class NotificationController extends Controller
             'user_id' => 'required|email|exists:users,email',
             'titulo' => 'required|string|max:255',
             'mensaje' => 'required|string',
-            'url' => 'nullable|string'
+            'url' => 'nullable|string',
         ]);
 
         $user = User::where('email', $validated['user_id'])->firstOrFail();

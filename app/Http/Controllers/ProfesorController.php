@@ -69,25 +69,25 @@ class ProfesorController extends Controller
         $authUser = Auth::user();
 
         $isAdmin = $authUser->role === 'admin';
-        $isSelf  = (int) $profesor->user_id === (int) $authUser->id;
+        $isSelf = (int) $profesor->user_id === (int) $authUser->id;
 
         if (! $isAdmin && ! $isSelf) {
             return response()->json(['message' => 'No autorizado.'], 403);
         }
 
         $rules = [
-            'cedula'           => 'sometimes|string|unique:profesores,cedula,'.$id,
-            'telefono'         => 'nullable|string|max:20',
-            'municipio'        => 'nullable|string|max:255',
-            'especialidad'     => 'nullable|string|max:255',
-            'titulo'           => 'nullable|in:licenciatura,maestria,doctorado',
-            'departamento'     => 'nullable|string|max:255',
+            'cedula' => 'sometimes|string|unique:profesores,cedula,'.$id,
+            'telefono' => 'nullable|string|max:20',
+            'municipio' => 'nullable|string|max:255',
+            'especialidad' => 'nullable|string|max:255',
+            'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
+            'departamento' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
-            'genero'           => 'nullable|in:masculino,femenino,otro',
+            'genero' => 'nullable|in:masculino,femenino,otro',
         ];
 
         if ($isAdmin) {
-            $rules['name']  = 'sometimes|string|max:255';
+            $rules['name'] = 'sometimes|string|max:255';
             $rules['email'] = 'sometimes|email|unique:users,email,'.$profesor->user_id;
         }
 
@@ -96,7 +96,7 @@ class ProfesorController extends Controller
         if ($isAdmin) {
             $userFields = array_filter(
                 array_intersect_key($data, array_flip(['name', 'email'])),
-                fn($v) => $v !== null,
+                fn ($v) => $v !== null,
             );
             if (! empty($userFields)) {
                 $profesor->user->update($userFields);

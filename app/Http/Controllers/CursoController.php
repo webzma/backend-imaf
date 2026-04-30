@@ -16,16 +16,16 @@ class CursoController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'profesor_id'  => ['required', Rule::exists('profesores', 'id')],
-            'nombre'       => 'required|string|max:255',
-            'limite_cupo'  => 'required|integer|min:1',
+            'profesor_id' => ['required', Rule::exists('profesores', 'id')],
+            'nombre' => 'required|string|max:255',
+            'limite_cupo' => 'required|integer|min:1',
             'fecha_inicio' => 'nullable|date',
-            'fecha_fin'    => 'nullable|date|after_or_equal:fecha_inicio',
-            'descripcion'  => 'nullable|string',
-            'requisitos'   => 'nullable|string',
-            'precio'       => 'required|numeric|min:0',
+            'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
+            'descripcion' => 'nullable|string',
+            'requisitos' => 'nullable|string',
+            'precio' => 'required|numeric|min:0',
             'whatsapp_url' => 'nullable|url|max:500',
-            'estado'       => 'in:activo,inactivo',
+            'estado' => 'in:activo,inactivo',
         ]);
 
         $curso = Curso::create($data);
@@ -45,16 +45,16 @@ class CursoController extends Controller
         $curso = Curso::findOrFail($id);
 
         $data = $request->validate([
-            'profesor_id'  => ['sometimes', Rule::exists('profesores', 'id')],
-            'nombre'       => 'sometimes|string|max:255',
-            'limite_cupo'  => 'sometimes|integer|min:1',
+            'profesor_id' => ['sometimes', Rule::exists('profesores', 'id')],
+            'nombre' => 'sometimes|string|max:255',
+            'limite_cupo' => 'sometimes|integer|min:1',
             'fecha_inicio' => 'nullable|date',
-            'fecha_fin'    => 'nullable|date|after_or_equal:fecha_inicio',
-            'descripcion'  => 'nullable|string',
-            'requisitos'   => 'nullable|string',
-            'precio'       => 'sometimes|numeric|min:0',
+            'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
+            'descripcion' => 'nullable|string',
+            'requisitos' => 'nullable|string',
+            'precio' => 'sometimes|numeric|min:0',
             'whatsapp_url' => 'nullable|url|max:500',
-            'estado'       => 'in:activo,inactivo',
+            'estado' => 'in:activo,inactivo',
         ]);
 
         $curso->update($data);

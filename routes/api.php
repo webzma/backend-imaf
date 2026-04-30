@@ -31,7 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('notificaciones/{id}/read', [NotificationController::class, 'markAsRead']);
         Route::post('notificaciones/mark-all-read', [NotificationController::class, 'markAllAsRead']);
         Route::post('notificaciones/send', [NotificationController::class, 'send']);
-        
+
         Route::apiResource('profesores', ProfesorController::class);
         Route::apiResource('cursos', CursoController::class);
 

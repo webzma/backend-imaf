@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Pago extends Model
 {
     use SoftDeletes;
+
     protected $fillable = [
         'user_id',
         'curso_id',
