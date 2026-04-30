@@ -27,6 +27,7 @@ class ProfesorController extends Controller
             'especialidad' => 'nullable|string|max:255',
             'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
             'departamento' => 'nullable|string|max:255',
+            'municipio' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
         ]);
@@ -46,6 +47,7 @@ class ProfesorController extends Controller
                 'especialidad' => $request->especialidad,
                 'titulo' => $request->titulo,
                 'departamento' => $request->departamento,
+                'municipio' => $request->municipio,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
                 'genero' => $request->genero,
             ]);
@@ -63,23 +65,45 @@ class ProfesorController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $profesor = Profesor::findOrFail($id);
+        $profesor = Profesor::with('user')->findOrFail($id);
+        $authUser = Auth::user();
 
-        if ((int) $profesor->user_id !== (int) Auth::id()) {
+        $isAdmin = $authUser->role === 'admin';
+        $isSelf  = (int) $profesor->user_id === (int) $authUser->id;
+
+        if (! $isAdmin && ! $isSelf) {
             return response()->json(['message' => 'No autorizado.'], 403);
         }
 
-        $data = $request->validate([
-            'cedula' => 'sometimes|string|unique:profesores,cedula,'.$id,
-            'telefono' => 'nullable|string|max:20',
-            'especialidad' => 'nullable|string|max:255',
-            'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
-            'departamento' => 'nullable|string|max:255',
+        $rules = [
+            'cedula'           => 'sometimes|string|unique:profesores,cedula,'.$id,
+            'telefono'         => 'nullable|string|max:20',
+            'especialidad'     => 'nullable|string|max:255',
+            'titulo'           => 'nullable|in:licenciatura,maestria,doctorado',
+            'departamento'     => 'nullable|string|max:255',
+            'municipio'        => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
-            'genero' => 'nullable|in:masculino,femenino,otro',
-        ]);
+            'genero'           => 'nullable|in:masculino,femenino,otro',
+        ];
 
-        $profesor->update($data);
+        if ($isAdmin) {
+            $rules['name']  = 'sometimes|string|max:255';
+            $rules['email'] = 'sometimes|email|unique:users,email,'.$profesor->user_id;
+        }
+
+        $data = $request->validate($rules);
+
+        if ($isAdmin) {
+            $userFields = array_filter(
+                array_intersect_key($data, array_flip(['name', 'email'])),
+                fn($v) => $v !== null,
+            );
+            if (! empty($userFields)) {
+                $profesor->user->update($userFields);
+            }
+        }
+
+        $profesor->update(array_diff_key($data, array_flip(['name', 'email'])));
 
         return response()->json($profesor->load('user'));
     }
