@@ -13,6 +13,15 @@ class CursoController extends Controller
         return response()->json(Curso::with('profesor.user', 'estudiantes.user')->get());
     }
 
+    public function indexActivos()
+    {
+        return response()->json(
+            Curso::with('profesor.user', 'estudiantes.user')
+                ->where('estado', 'activo')
+                ->get()
+        );
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
