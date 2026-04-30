@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Pago;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ReporteController extends Controller
 {
@@ -42,7 +41,7 @@ class ReporteController extends Controller
 
             case 'anual':
                 $query->where('pagos.created_at', '>=', now()->subYears(5))
-                    ->selectRaw("YEAR(pagos.created_at) as label, SUM(cursos.precio) as total, COUNT(pagos.id) as cantidad")
+                    ->selectRaw('YEAR(pagos.created_at) as label, SUM(cursos.precio) as total, COUNT(pagos.id) as cantidad')
                     ->groupByRaw('YEAR(pagos.created_at)')
                     ->orderByRaw('YEAR(pagos.created_at)');
                 break;
