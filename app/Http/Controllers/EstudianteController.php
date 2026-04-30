@@ -48,6 +48,7 @@ class EstudianteController extends Controller
             'curso_id' => 'nullable|exists:cursos,id',
             'cedula' => 'required|string|unique:estudiantes,cedula',
             'telefono' => 'nullable|string|max:20',
+            'municipio' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
             'fecha_inscripcion' => 'required|date',
@@ -68,6 +69,7 @@ class EstudianteController extends Controller
                 'nombre' => $request->name,
                 'cedula' => $request->cedula,
                 'telefono' => $request->telefono,
+                'municipio' => $request->municipio,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
                 'genero' => $request->genero,
                 'fecha_inscripcion' => $request->fecha_inscripcion,
@@ -136,6 +138,7 @@ class EstudianteController extends Controller
 
         $data = $request->validate([
             'telefono' => 'nullable|string|max:20',
+            'municipio' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
         ]);
@@ -162,6 +165,7 @@ class EstudianteController extends Controller
             'nombre' => 'sometimes|string|max:255',
             'cedula' => 'sometimes|string|unique:estudiantes,cedula,'.$id,
             'telefono' => 'nullable|string|max:20',
+            'municipio' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
             'fecha_inscripcion' => 'sometimes|date',
