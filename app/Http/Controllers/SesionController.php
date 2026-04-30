@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Sesion;
 use App\Models\Curso;
+use App\Models\Sesion;
 use Illuminate\Http\Request;
 
 class SesionController extends Controller
@@ -22,12 +22,12 @@ class SesionController extends Controller
         Curso::findOrFail($cursoId);
 
         $data = $request->validate([
-            'titulo'      => 'required|string|max:255',
+            'titulo' => 'required|string|max:255',
             'descripcion' => 'nullable|string',
-            'fecha'       => 'required|date',
+            'fecha' => 'required|date',
             'hora_inicio' => 'nullable|date_format:H:i',
-            'hora_fin'    => 'nullable|date_format:H:i|after:hora_inicio',
-            'estado'      => 'in:programada,realizada,cancelada',
+            'hora_fin' => 'nullable|date_format:H:i|after:hora_inicio',
+            'estado' => 'in:programada,realizada,cancelada',
         ]);
 
         $sesion = Sesion::create(['curso_id' => $cursoId, ...$data]);
@@ -40,12 +40,12 @@ class SesionController extends Controller
         $sesion = Sesion::where('curso_id', $cursoId)->findOrFail($id);
 
         $data = $request->validate([
-            'titulo'      => 'sometimes|string|max:255',
+            'titulo' => 'sometimes|string|max:255',
             'descripcion' => 'nullable|string',
-            'fecha'       => 'sometimes|date',
+            'fecha' => 'sometimes|date',
             'hora_inicio' => 'nullable|date_format:H:i',
-            'hora_fin'    => 'nullable|date_format:H:i|after:hora_inicio',
-            'estado'      => 'in:programada,realizada,cancelada',
+            'hora_fin' => 'nullable|date_format:H:i|after:hora_inicio',
+            'estado' => 'in:programada,realizada,cancelada',
         ]);
 
         $sesion->update($data);
