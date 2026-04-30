@@ -20,7 +20,7 @@ class EstudianteController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('nombre', 'like', "%{$search}%")
-                  ->orWhere('cedula', 'like', "%{$search}%");
+                    ->orWhere('cedula', 'like', "%{$search}%");
             });
         }
 
@@ -101,32 +101,32 @@ class EstudianteController extends Controller
             ], 404);
         }
 
-        $curso    = $estudiante->curso;
+        $curso = $estudiante->curso;
         $profesor = $curso->profesor;
 
         return response()->json([
             'curso' => [
-                'id'                     => $curso->id,
-                'codigo'                 => $curso->codigo,
-                'nombre'                 => $curso->nombre,
-                'descripcion'            => $curso->descripcion,
-                'requisitos'             => $curso->requisitos,
-                'precio'                 => $curso->precio,
-                'fecha_inicio'           => $curso->fecha_inicio,
-                'fecha_fin'              => $curso->fecha_fin,
-                'estado'                 => $curso->estado,
-                'limite_cupo'            => $curso->limite_cupo,
-                'cupos_restantes'        => $curso->cupos_restantes,
-                'whatsapp_url'           => $curso->whatsapp_url,
-                'profesor'               => $profesor ? [
-                    'id'           => $profesor->id,
-                    'nombre'       => $profesor->user?->name,
+                'id' => $curso->id,
+                'codigo' => $curso->codigo,
+                'nombre' => $curso->nombre,
+                'descripcion' => $curso->descripcion,
+                'requisitos' => $curso->requisitos,
+                'precio' => $curso->precio,
+                'fecha_inicio' => $curso->fecha_inicio,
+                'fecha_fin' => $curso->fecha_fin,
+                'estado' => $curso->estado,
+                'limite_cupo' => $curso->limite_cupo,
+                'cupos_restantes' => $curso->cupos_restantes,
+                'whatsapp_url' => $curso->whatsapp_url,
+                'profesor' => $profesor ? [
+                    'id' => $profesor->id,
+                    'nombre' => $profesor->user?->name,
                     'especialidad' => $profesor->especialidad,
-                    'titulo'       => $profesor->titulo,
+                    'titulo' => $profesor->titulo,
                     'departamento' => $profesor->departamento,
                 ] : null,
             ],
-            'estado_pago'             => $estudiante->estado_pago,
+            'estado_pago' => $estudiante->estado_pago,
             'estado_aprobacion_curso' => $estudiante->estado_aprobacion_curso,
         ]);
     }

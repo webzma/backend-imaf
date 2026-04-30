@@ -26,22 +26,22 @@ class AuthController extends Controller
 
         $user = DB::transaction(function () use ($request) {
             $user = User::create([
-                'name'     => $request->name,
-                'email'    => $request->email,
+                'name' => $request->name,
+                'email' => $request->email,
                 'password' => $request->password,
-                'role'     => 'estudiante',
+                'role' => 'estudiante',
             ]);
 
             Estudiante::create([
-                'user_id'          => $user->id,
-                'nombre'           => $request->name,
-                'cedula'           => $request->cedula,
-                'telefono'         => $request->telefono,
-                'municipio'        => $request->municipio,
+                'user_id' => $user->id,
+                'nombre' => $request->name,
+                'cedula' => $request->cedula,
+                'telefono' => $request->telefono,
+                'municipio' => $request->municipio,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
-                'genero'           => $request->genero,
-                'fecha_inscripcion'=> now()->toDateString(),
-                'estado'           => 'activo',
+                'genero' => $request->genero,
+                'fecha_inscripcion' => now()->toDateString(),
+                'estado' => 'activo',
             ]);
 
             return $user;
@@ -50,7 +50,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user'  => $user->load('estudiante'),
+            'user' => $user->load('estudiante'),
             'token' => $token,
         ], 201);
     }
@@ -91,8 +91,8 @@ class AuthController extends Controller
 
         $profile = match ($user->role) {
             'estudiante' => $user->load('estudiante.curso'),
-            'profesor'   => $user->load('profesor.cursos'),
-            default      => $user,
+            'profesor' => $user->load('profesor.cursos'),
+            default => $user,
         };
 
         return response()->json($profile);

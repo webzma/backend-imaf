@@ -19,7 +19,7 @@ class CertificadoController extends Controller
             ], 422);
         }
 
-        $curso    = $estudiante->curso;
+        $curso = $estudiante->curso;
         $profesor = $curso?->profesor;
 
         if (! $curso || ! $profesor) {
@@ -31,7 +31,7 @@ class CertificadoController extends Controller
         $pdf = Pdf::loadView('certificado', compact('estudiante', 'curso', 'profesor'))
             ->setPaper('a4', 'landscape');
 
-        $filename = 'certificado_' . str($estudiante->nombre)->slug() . '.pdf';
+        $filename = 'certificado_'.str($estudiante->nombre)->slug().'.pdf';
 
         return $pdf->download($filename);
     }
