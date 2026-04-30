@@ -24,6 +24,7 @@ class ProfesorController extends Controller
             'password' => 'required|string|min:8',
             'cedula' => 'required|string|unique:profesores,cedula',
             'telefono' => 'nullable|string|max:20',
+            'municipio' => 'nullable|string|max:255',
             'especialidad' => 'nullable|string|max:255',
             'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
             'departamento' => 'nullable|string|max:255',
@@ -44,6 +45,7 @@ class ProfesorController extends Controller
                 'user_id' => $user->id,
                 'cedula' => $request->cedula,
                 'telefono' => $request->telefono,
+                'municipio' => $request->municipio,
                 'especialidad' => $request->especialidad,
                 'titulo' => $request->titulo,
                 'departamento' => $request->departamento,
@@ -75,6 +77,7 @@ class ProfesorController extends Controller
             return response()->json(['message' => 'No autorizado.'], 403);
         }
 
+<<<<<<< HEAD
         $rules = [
             'cedula'           => 'sometimes|string|unique:profesores,cedula,'.$id,
             'telefono'         => 'nullable|string|max:20',
@@ -82,6 +85,15 @@ class ProfesorController extends Controller
             'titulo'           => 'nullable|in:licenciatura,maestria,doctorado',
             'departamento'     => 'nullable|string|max:255',
             'municipio'        => 'nullable|string|max:255',
+=======
+        $data = $request->validate([
+            'cedula' => 'sometimes|string|unique:profesores,cedula,'.$id,
+            'telefono' => 'nullable|string|max:20',
+            'municipio' => 'nullable|string|max:255',
+            'especialidad' => 'nullable|string|max:255',
+            'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
+            'departamento' => 'nullable|string|max:255',
+>>>>>>> 976b303e729a317b4cbce6068e21e965626155ab
             'fecha_nacimiento' => 'nullable|date',
             'genero'           => 'nullable|in:masculino,femenino,otro',
         ];

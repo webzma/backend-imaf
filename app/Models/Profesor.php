@@ -15,6 +15,7 @@ class Profesor extends Model
         'user_id',
         'cedula',
         'telefono',
+        'municipio',
         'especialidad',
         'titulo',
         'departamento',
