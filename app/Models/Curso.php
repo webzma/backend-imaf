@@ -54,4 +54,14 @@ class Curso extends Model
     {
         return $this->hasMany(Estudiante::class);
     }
+
+    public function temario()
+    {
+        return $this->hasMany(Temario::class)->orderBy('orden');
+    }
+
+    public function sesiones()
+    {
+        return $this->hasMany(Sesion::class)->orderBy('fecha')->orderBy('hora_inicio');
+    }
 }

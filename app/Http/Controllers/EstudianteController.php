@@ -91,7 +91,7 @@ class EstudianteController extends Controller
 
     public function miCurso()
     {
-        $estudiante = Estudiante::with('curso.profesor.user')
+        $estudiante = Estudiante::with('curso.profesor.user', 'curso.temario', 'curso.sesiones')
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
@@ -125,6 +125,21 @@ class EstudianteController extends Controller
                     'titulo' => $profesor->titulo,
                     'departamento' => $profesor->departamento,
                 ] : null,
+                'temario' => $curso->temario->map(fn ($t) => [
+                    'id' => $t->id,
+                    'titulo' => $t->titulo,
+                    'descripcion' => $t->descripcion,
+                    'orden' => $t->orden,
+                ]),
+                'sesiones' => $curso->sesiones->map(fn ($s) => [
+                    'id' => $s->id,
+                    'titulo' => $s->titulo,
+                    'descripcion' => $s->descripcion,
+                    'fecha' => $s->fecha,
+                    'hora_inicio' => $s->hora_inicio,
+                    'hora_fin' => $s->hora_fin,
+                    'estado' => $s->estado,
+                ]),
             ],
             'estado_pago' => $estudiante->estado_pago,
             'estado_aprobacion_curso' => $estudiante->estado_aprobacion_curso,
