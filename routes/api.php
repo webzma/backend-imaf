@@ -8,6 +8,9 @@ use App\Http\Controllers\EstudianteController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PagoController;
 use App\Http\Controllers\ProfesorController;
+use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\SesionController;
+use App\Http\Controllers\TemarioController;
 use Illuminate\Support\Facades\Route;
 
 // Rutas públicas
@@ -35,6 +38,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('profesores', ProfesorController::class);
         Route::apiResource('cursos', CursoController::class);
 
+        // Temario y sesiones de cursos
+        Route::get('cursos/{cursoId}/temario', [TemarioController::class, 'index']);
+        Route::post('cursos/{cursoId}/temario', [TemarioController::class, 'store']);
+        Route::put('cursos/{cursoId}/temario/{id}', [TemarioController::class, 'update']);
+        Route::delete('cursos/{cursoId}/temario/{id}', [TemarioController::class, 'destroy']);
+
+        Route::get('cursos/{cursoId}/sesiones', [SesionController::class, 'index']);
+        Route::post('cursos/{cursoId}/sesiones', [SesionController::class, 'store']);
+        Route::put('cursos/{cursoId}/sesiones/{id}', [SesionController::class, 'update']);
+        Route::delete('cursos/{cursoId}/sesiones/{id}', [SesionController::class, 'destroy']);
+
         // Pagos Admin
         Route::get('pagos', [PagoController::class, 'index']);
         Route::put('pagos/{id}', [PagoController::class, 'update']);
@@ -42,6 +56,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Certificados
         Route::get('estudiantes/{id}/certificado', [CertificadoController::class, 'download']);
+
+        // Reportes
+        Route::get('reportes', [ReporteController::class, 'index']);
     });
 
     // Profesor y admin
@@ -60,7 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Solo estudiante
     Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {
-        Route::get('cursos', [CursoController::class, 'index']);
+        Route::get('cursos', [CursoController::class, 'indexActivos']);
         Route::get('cursos/{id}', [CursoController::class, 'show']);
         Route::get('curso', [EstudianteController::class, 'miCurso']);
         Route::get('perfil', [EstudianteController::class, 'showMe']);
