@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Profesor;
 use App\Models\User;
+use App\Models\TipoContrato;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,12 @@ class ProfesorController extends Controller
 {
     public function index()
     {
-        return response()->json(Profesor::with('user')->get());
+        return response()->json(Profesor::with('user', 'tipoContrato')->get());
+    }
+
+    public function getTipoContratos()
+    {
+        return response()->json(TipoContrato::all());
     }
 
     public function store(Request $request)
@@ -30,6 +36,7 @@ class ProfesorController extends Controller
             'departamento' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
+            'tipo_contrato_id' => 'required|exists:tipo_contratos,id',
         ]);
 
         $profesor = DB::transaction(function () use ($request) {
@@ -50,15 +57,16 @@ class ProfesorController extends Controller
                 'departamento' => $request->departamento,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
                 'genero' => $request->genero,
+                'tipo_contrato_id' => $request->tipo_contrato_id,
             ]);
         });
 
-        return response()->json($profesor->load('user'), 201);
+        return response()->json($profesor->load('user', 'tipoContrato'), 201);
     }
 
     public function show(string $id)
     {
-        $profesor = Profesor::with('user', 'cursos')->findOrFail($id);
+        $profesor = Profesor::with('user', 'cursos', 'tipoContrato')->findOrFail($id);
 
         return response()->json($profesor);
     }
@@ -84,6 +92,7 @@ class ProfesorController extends Controller
             'departamento' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
+            'tipo_contrato_id' => 'sometimes|exists:tipo_contratos,id',
         ];
 
         if ($isAdmin) {
@@ -105,7 +114,7 @@ class ProfesorController extends Controller
 
         $profesor->update(array_diff_key($data, array_flip(['name', 'email'])));
 
-        return response()->json($profesor->load('user'));
+        return response()->json($profesor->load('user', 'tipoContrato'));
     }
 
     public function destroy(string $id)

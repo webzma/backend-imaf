@@ -36,6 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('notificaciones/send', [NotificationController::class, 'send']);
 
         Route::apiResource('profesores', ProfesorController::class);
+        Route::get('tipo-contratos', [ProfesorController::class, 'getTipoContratos']);
         Route::apiResource('cursos', CursoController::class);
 
         // Temario y sesiones de cursos
