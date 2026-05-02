@@ -91,7 +91,7 @@ class EstudianteController extends Controller
 
     public function miCurso()
     {
-        $estudiante = Estudiante::with('curso.profesor.user', 'curso.temario', 'curso.sesiones')
+        $estudiante = Estudiante::with('curso.instructor.user', 'curso.temario', 'curso.sesiones')
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
@@ -102,7 +102,7 @@ class EstudianteController extends Controller
         }
 
         $curso = $estudiante->curso;
-        $profesor = $curso->profesor;
+        $profesor = $curso->instructor;
 
         return response()->json([
             'curso' => [
@@ -224,10 +224,10 @@ class EstudianteController extends Controller
      */
     public function updateAprobacionCurso(Request $request, string $id)
     {
-        $estudiante = Estudiante::with('user', 'curso.profesor')->findOrFail($id);
+        $estudiante = Estudiante::with('user', 'curso.instructor')->findOrFail($id);
 
         $curso = $estudiante->curso;
-        if (! $curso || ! $curso->profesor || (int) $curso->profesor->user_id !== (int) Auth::id()) {
+        if (! $curso || ! $curso->instructor || (int) $curso->instructor->user_id !== (int) Auth::id()) {
             return response()->json(['message' => 'No autorizado para este curso.'], 403);
         }
 

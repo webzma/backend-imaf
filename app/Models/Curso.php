@@ -45,7 +45,7 @@ class Curso extends Model
         return max(0, $this->limite_cupo - $ocupados);
     }
 
-    public function profesor()
+    public function instructor()
     {
         return $this->belongsTo(Profesor::class, 'profesor_id');
     }
