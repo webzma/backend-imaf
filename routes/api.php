@@ -73,6 +73,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('cursos/{id}', [CursoController::class, 'show']);
         Route::get('estudiantes', [EstudianteController::class, 'index']);
         Route::get('estudiantes/{id}', [EstudianteController::class, 'show']);
+
+        // Asistencia accesible por admin y profesor (con autorización interna por curso)
+        Route::get('sesiones/{sesionId}/asistencia', [AsistenciaController::class, 'show']);
+        Route::post('sesiones/{sesionId}/asistencia', [AsistenciaController::class, 'store']);
     });
 
     // Solo profesor
