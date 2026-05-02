@@ -21,6 +21,7 @@ class Profesor extends Model
         'departamento',
         'fecha_nacimiento',
         'genero',
+        'tipo_contrato_id',
     ];
 
     protected function casts(): array
@@ -33,6 +34,11 @@ class Profesor extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function tipoContrato()
+    {
+        return $this->belongsTo(TipoContrato::class, 'tipo_contrato_id');
     }
 
     public function cursos()
