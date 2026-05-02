@@ -2,10 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
-
 use App\Models\TipoContrato;
+use Illuminate\Database\Seeder;
 
 class TipoContratoSeeder extends Seeder
 {

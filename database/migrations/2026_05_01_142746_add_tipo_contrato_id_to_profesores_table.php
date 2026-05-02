@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
+return new class() extends Migration
 {
     /**
      * Run the migrations.
@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('profesores', function (Blueprint $table) {
-            if (!Schema::hasColumn('profesores', 'tipo_contrato_id')) {
+            if (! Schema::hasColumn('profesores', 'tipo_contrato_id')) {
                 $table->foreignId('tipo_contrato_id')->nullable()->constrained('tipo_contratos')->onDelete('set null');
             } else {
                 $table->foreignId('tipo_contrato_id')->nullable()->change()->constrained('tipo_contratos')->onDelete('set null');
