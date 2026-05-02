@@ -10,13 +10,13 @@ class CursoController extends Controller
 {
     public function index()
     {
-        return response()->json(Curso::with('profesor.user', 'estudiantes.user')->get());
+        return response()->json(Curso::with('instructor.user', 'estudiantes.user')->get());
     }
 
     public function indexActivos()
     {
         return response()->json(
-            Curso::with('profesor.user', 'estudiantes.user')
+            Curso::with('instructor.user', 'estudiantes.user')
                 ->where('estado', 'activo')
                 ->get()
         );
@@ -39,12 +39,12 @@ class CursoController extends Controller
 
         $curso = Curso::create($data);
 
-        return response()->json($curso->load('profesor'), 201);
+        return response()->json($curso->load('instructor'), 201);
     }
 
     public function show(string $id)
     {
-        $curso = Curso::with('profesor.user', 'estudiantes.user', 'temario', 'sesiones')->findOrFail($id);
+        $curso = Curso::with('instructor.user', 'estudiantes.user', 'temario', 'sesiones')->findOrFail($id);
 
         return response()->json($curso);
     }
@@ -68,7 +68,7 @@ class CursoController extends Controller
 
         $curso->update($data);
 
-        return response()->json($curso->load('profesor'));
+        return response()->json($curso->load('instructor'));
     }
 
     public function destroy(string $id)

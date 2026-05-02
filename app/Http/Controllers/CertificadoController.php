@@ -10,7 +10,7 @@ class CertificadoController extends Controller
 {
     public function download(Request $request, string $estudianteId)
     {
-        $estudiante = Estudiante::with(['curso.profesor.user', 'user'])
+        $estudiante = Estudiante::with(['curso.instructor.user', 'user'])
             ->findOrFail($estudianteId);
 
         if ($estudiante->estado_aprobacion_curso !== 'aprobado') {
@@ -20,7 +20,7 @@ class CertificadoController extends Controller
         }
 
         $curso = $estudiante->curso;
-        $profesor = $curso?->profesor;
+        $profesor = $curso?->instructor;
 
         if (! $curso || ! $profesor) {
             return response()->json([
