@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AsistenciaController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CertificadoController;
 use App\Http\Controllers\CursoController;
@@ -49,6 +50,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('cursos/{cursoId}/sesiones', [SesionController::class, 'store']);
         Route::put('cursos/{cursoId}/sesiones/{id}', [SesionController::class, 'update']);
         Route::delete('cursos/{cursoId}/sesiones/{id}', [SesionController::class, 'destroy']);
+
+        // Asistencia por sesión
+        Route::get('sesiones/{sesionId}/asistencia', [AsistenciaController::class, 'show']);
+        Route::post('sesiones/{sesionId}/asistencia', [AsistenciaController::class, 'store']);
 
         // Pagos Admin
         Route::get('pagos', [PagoController::class, 'index']);
