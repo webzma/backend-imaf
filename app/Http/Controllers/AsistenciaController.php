@@ -6,12 +6,20 @@ use App\Models\Asistencia;
 use App\Models\Estudiante;
 use App\Models\Sesion;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AsistenciaController extends Controller
 {
     public function show(string $sesionId)
     {
-        $sesion = Sesion::with('curso:id,nombre')->findOrFail($sesionId);
+        $sesion = Sesion::with('curso:id,nombre,profesor_id')->findOrFail($sesionId);
+
+        $authUser = Auth::user();
+        if ($authUser->isProfesor()) {
+            if ((int) $sesion->curso->profesor_id !== (int) $authUser->profesor->id) {
+                return response()->json(['message' => 'No autorizado.'], 403);
+            }
+        }
 
         $estudiantes = Estudiante::where('curso_id', $sesion->curso_id)
             ->select('id', 'nombre', 'cedula')
@@ -50,7 +58,14 @@ class AsistenciaController extends Controller
 
     public function store(Request $request, string $sesionId)
     {
-        Sesion::findOrFail($sesionId);
+        $sesion = Sesion::with('curso:id,profesor_id')->findOrFail($sesionId);
+
+        $authUser = Auth::user();
+        if ($authUser->isProfesor()) {
+            if ((int) $sesion->curso->profesor_id !== (int) $authUser->profesor->id) {
+                return response()->json(['message' => 'No autorizado.'], 403);
+            }
+        }
 
         $data = $request->validate([
             'asistencia' => 'required|array',
