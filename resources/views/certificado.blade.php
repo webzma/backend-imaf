@@ -97,7 +97,7 @@
 
         <div class="firma">
             <div class="linea-firma"></div>
-            <div class="nombre-firma">{{ $profesor->user->name }}</div>
+            <div class="nombre-firma">{{ $profesor->user->name ?? $profesor->nombre ?? 'Instructor' }}</div>
             <div class="nombre-firma" style="color:#aaa; font-size:11px;">Profesor del curso</div>
         </div>
     </div>

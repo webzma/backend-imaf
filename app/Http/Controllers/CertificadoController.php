@@ -5,17 +5,35 @@ namespace App\Http\Controllers;
 use App\Models\Estudiante;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class CertificadoController extends Controller
 {
-    public function download(Request $request, string $estudianteId)
+    public function download(Request $request, string $id)
     {
         $estudiante = Estudiante::with(['curso.instructor.user', 'user'])
-            ->findOrFail($estudianteId);
+            ->findOrFail($id);
 
-        if ($estudiante->estado_aprobacion_curso !== 'aprobado') {
+        return $this->buildCertificadoResponse($estudiante);
+    }
+
+    public function downloadMe(Request $request)
+    {
+        $estudiante = Estudiante::with(['curso.instructor.user', 'user'])
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        return $this->buildCertificadoResponse($estudiante);
+    }
+
+    private function buildCertificadoResponse(Estudiante $estudiante)
+    {
+        $aprobadoPorAdmin = $estudiante->estado_pago === 'aprobado';
+        $aprobadoPorProfesor = $estudiante->estado_aprobacion_curso === 'aprobado';
+
+        if (! $aprobadoPorAdmin && ! $aprobadoPorProfesor) {
             return response()->json([
-                'message' => 'El estudiante no ha completado el curso.',
+                'message' => 'El estudiante no tiene una aprobación válida para generar certificado.',
             ], 422);
         }
 
@@ -28,11 +46,19 @@ class CertificadoController extends Controller
             ], 422);
         }
 
-        $pdf = Pdf::loadView('certificado', compact('estudiante', 'curso', 'profesor'))
-            ->setPaper('a4', 'landscape');
+        try {
+            $pdf = Pdf::loadView('certificado', compact('estudiante', 'curso', 'profesor'))
+                ->setPaper('a4', 'landscape');
 
-        $filename = 'certificado_'.str($estudiante->nombre)->slug().'.pdf';
+            $filename = 'certificado_'.str($estudiante->nombre)->slug().'.pdf';
 
-        return $pdf->download($filename);
+            return $pdf->download($filename);
+        } catch (\Exception $e) {
+            \Log::error('Error generando certificado: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'Error al generar el certificado: '.$e->getMessage(),
+            ], 500);
+        }
     }
 }

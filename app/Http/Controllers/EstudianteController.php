@@ -118,7 +118,7 @@ class EstudianteController extends Controller
                 'limite_cupo' => $curso->limite_cupo,
                 'cupos_restantes' => $curso->cupos_restantes,
                 'whatsapp_url' => $curso->whatsapp_url,
-                'profesor' => $profesor ? [
+                'instructor' => $profesor ? [
                     'id' => $profesor->id,
                     'nombre' => $profesor->user?->name,
                     'especialidad' => $profesor->especialidad,

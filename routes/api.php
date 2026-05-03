@@ -90,6 +90,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('cursos', [CursoController::class, 'indexActivos']);
         Route::get('cursos/{id}', [CursoController::class, 'show']);
         Route::get('curso', [EstudianteController::class, 'miCurso']);
+        Route::get('certificado', [CertificadoController::class, 'downloadMe']);
         Route::get('perfil', [EstudianteController::class, 'showMe']);
         Route::put('perfil', [EstudianteController::class, 'updateMe']);
         Route::get('notificaciones', [NotificationController::class, 'index']);
