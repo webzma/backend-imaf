@@ -82,7 +82,7 @@ class EstudianteController extends Controller
 
     public function showMe()
     {
-        $estudiante = Estudiante::with('user', 'curso')
+        $estudiante = Estudiante::with('user', 'curso.instructor.user')
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
