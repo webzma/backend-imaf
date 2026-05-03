@@ -12,7 +12,7 @@ class TipoContratoSeeder extends Seeder
      */
     public function run(): void
     {
-        TipoContrato::updateOrCreate(['nombre' => 'Instructor IMAF']);
-        TipoContrato::updateOrCreate(['nombre' => 'Instructor Externo']);
+        TipoContrato::updateOrCreate(['nombre' => 'Contrato IMAF']);
+        TipoContrato::updateOrCreate(['nombre' => 'Contrato Externo']);
     }
 }

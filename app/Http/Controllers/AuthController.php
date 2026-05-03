@@ -91,7 +91,7 @@ class AuthController extends Controller
 
         $profile = match ($user->role) {
             'estudiante' => $user->load('estudiante.curso'),
-            'profesor' => $user->load('profesor.cursos'),
+            'profesor' => $user->load('profesor.tipoContrato', 'profesor.cursos'),
             default => $user,
         };
 
