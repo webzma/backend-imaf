@@ -9,19 +9,21 @@
         }
         body {
             font-family: 'DejaVu Sans', sans-serif;
-            background: #faf8f7;
+            background: #ffffff;
             color: #1a1817;
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100vh;
+            width: 297mm;
+            height: 210mm;
         }
         .certificado {
-            width: 100%;
-            height: 100%;
+            width: 297mm;
+            height: 210mm;
             position: relative;
             background: #ffffff;
             overflow: hidden;
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
         .bg-deco-1 {
             position: absolute;
@@ -45,34 +47,30 @@
         }
         .border-outer {
             position: absolute;
-            inset: 20px;
+            inset: 15px;
             border: 3px solid rgba(214, 51, 132, 0.3);
             pointer-events: none;
         }
         .border-inner {
             position: absolute;
-            inset: 28px;
+            inset: 22px;
             border: 1px solid rgba(214, 51, 132, 0.15);
             pointer-events: none;
         }
         .header-line {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 20px;
+            top: 15px;
+            left: 15px;
+            right: 15px;
             height: 4px;
             background: linear-gradient(90deg, #d63384, #ff94bd);
         }
         .content {
             position: relative;
             z-index: 10;
-            padding: 60px 80px;
+            padding: 50px 70px 40px;
             text-align: center;
-            height: 100%;
             box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
         }
         .badge {
             display: inline-flex;
@@ -83,51 +81,51 @@
             text-transform: uppercase;
             color: #d63384;
             font-weight: 600;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
         .titulo {
-            font-size: 38px;
+            font-size: 36px;
             font-weight: 300;
             color: #1a1817;
             margin-bottom: 6px;
             letter-spacing: -0.5px;
         }
         .subtitulo {
-            font-size: 13px;
+            font-size: 12px;
             letter-spacing: 2.2px;
             text-transform: uppercase;
             color: #737373;
-            margin-bottom: 36px;
+            margin-bottom: 28px;
         }
         .divider {
             width: 80px;
             height: 1px;
             background: rgba(214, 51, 132, 0.3);
-            margin: 0 auto 28px;
+            margin: 0 auto 24px;
         }
         .otorga {
             font-size: 14px;
             color: #737373;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .nombre {
-            font-size: 40px;
+            font-size: 38px;
             font-weight: 300;
             color: #1a1817;
             border-bottom: 2px solid #d63384;
             display: inline-block;
-            padding: 0 48px 10px;
-            margin: 8px 0 28px;
+            padding: 0 48px 8px;
+            margin: 6px 0 24px;
             letter-spacing: -0.3px;
         }
         .texto {
             font-size: 14px;
             color: #444;
-            line-height: 1.7;
-            margin-bottom: 12px;
+            line-height: 1.6;
+            margin-bottom: 10px;
         }
         .curso-nombre {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 600;
             color: #d63384;
             margin-bottom: 4px;
@@ -143,15 +141,15 @@
             background: #ffd9e2;
             padding: 3px 10px;
             border-radius: 2px;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
         .fecha {
             font-size: 12px;
             color: #737373;
-            margin-top: 28px;
+            margin-top: 22px;
         }
         .firma-section {
-            margin-top: 36px;
+            margin-top: 28px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -173,7 +171,7 @@
         }
         .footer-note {
             position: absolute;
-            bottom: 32px;
+            bottom: 28px;
             left: 0;
             right: 0;
             text-align: center;
