@@ -25,6 +25,11 @@ class Curso extends Model
 
     protected $appends = ['cupos_restantes'];
 
+    protected $casts = [
+        'fecha_inicio' => 'date:Y-m-d',
+        'fecha_fin' => 'date:Y-m-d',
+    ];
+
     protected static function boot(): void
     {
         parent::boot();
