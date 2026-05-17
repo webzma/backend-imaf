@@ -51,6 +51,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('cursos/{cursoId}/sesiones/{id}', [SesionController::class, 'update']);
         Route::delete('cursos/{cursoId}/sesiones/{id}', [SesionController::class, 'destroy']);
 
+        // Horario / Calendario (sesiones globales)
+        Route::get('horario', [SesionController::class, 'horario']);
+        Route::post('sesiones', [SesionController::class, 'storeGlobal']);
+        Route::put('sesiones/{id}', [SesionController::class, 'updateGlobal']);
+        Route::delete('sesiones/{id}', [SesionController::class, 'destroyGlobal']);
+
         // Asistencia por sesión
         Route::get('sesiones/{sesionId}/asistencia', [AsistenciaController::class, 'show']);
         Route::post('sesiones/{sesionId}/asistencia', [AsistenciaController::class, 'store']);

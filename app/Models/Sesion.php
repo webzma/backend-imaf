@@ -18,6 +18,10 @@ class Sesion extends Model
         'estado',
     ];
 
+    protected $casts = [
+        'fecha' => 'date:Y-m-d',
+    ];
+
     public function curso()
     {
         return $this->belongsTo(Curso::class);
