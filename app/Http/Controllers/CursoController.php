@@ -79,7 +79,21 @@ class CursoController extends Controller
         ]);
 
         $oldProfesorId = $curso->profesor_id;
+        $oldEstado = $curso->estado;
         $curso->update($data);
+
+        // Notificar al profesor si el estado del curso cambió
+        if (isset($data['estado']) && $data['estado'] !== $oldEstado) {
+            $profesor = Profesor::with('user')->find($curso->profesor_id);
+            if ($profesor && $profesor->user) {
+                $estadoTexto = $data['estado'] === 'activo' ? 'activado' : 'inactivado';
+                $profesor->user->notify(new GenericNotification(
+                    'Estado de Curso Actualizado',
+                    "El curso '{$curso->nombre}' ha sido {$estadoTexto} por el administrador.",
+                    "/profesor/cursos/{$curso->id}"
+                ));
+            }
+        }
 
         // Si se cambió el profesor, notificar al nuevo profesor
         if (isset($data['profesor_id']) && (int) $data['profesor_id'] !== (int) $oldProfesorId) {
