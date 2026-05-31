@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\Pago;
+use App\Models\Profesor;
 use App\Models\User;
 use App\Notifications\GenericNotification;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
@@ -171,6 +172,22 @@ class PagoController extends Controller
         }
 
         $pago->refresh();
+
+        // Si el pago fue aprobado, notificar al profesor del curso
+        if ($request->estado === 'aprobado') {
+            $curso = Curso::find($pago->curso_id);
+            if ($curso && $curso->profesor_id) {
+                $profesor = Profesor::with('user')->find($curso->profesor_id);
+                if ($profesor && $profesor->user) {
+                    $estudianteNombre = $pago->user->name ?? 'Un estudiante';
+                    $profesor->user->notify(new GenericNotification(
+                        'Nueva inscripción aprobada',
+                        "El estudiante {$estudianteNombre} ha sido aprobado para el curso: {$curso->nombre}.",
+                        "/profesor/cursos/{$curso->id}"
+                    ));
+                }
+            }
+        }
 
         return response()->json([
             'message' => "Pago {$request->estado} con éxito.",
