@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Estudiante;
 use App\Models\User;
 use App\Notifications\SolicitudCursoProcesada;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -159,6 +160,44 @@ class EstudianteController extends Controller
         ]);
 
         $estudiante->update($data);
+        $estudiante->refresh();
+
+        return response()->json($estudiante->load('user', 'curso'));
+    }
+
+    public function uploadFotoMe(Request $request)
+    {
+        $request->validate([
+            'foto' => 'required|image|mimes:jpeg,jpg,png,webp|max:2048',
+        ]);
+
+        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+
+        try {
+            $upload = Cloudinary::uploadApi()->upload(
+                $request->file('foto')->getRealPath(),
+                [
+                    'folder' => 'imaf/perfiles',
+                    'public_id' => 'estudiante_'.$estudiante->id,
+                    'overwrite' => true,
+                    'invalidate' => true,
+                    'transformation' => [
+                        'width' => 400,
+                        'height' => 400,
+                        'crop' => 'fill',
+                        'gravity' => 'face',
+                    ],
+                ]
+            );
+        } catch (\Throwable $e) {
+            \Log::error('Error subiendo foto de estudiante: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'No se pudo subir la imagen. Inténtalo de nuevo.',
+            ], 500);
+        }
+
+        $estudiante->update(['foto' => $upload['secure_url']]);
         $estudiante->refresh();
 
         return response()->json($estudiante->load('user', 'curso'));

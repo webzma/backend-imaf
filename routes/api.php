@@ -88,6 +88,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Solo profesor
     Route::middleware('role:profesor')->prefix('profesor')->group(function () {
         Route::put('perfil/{id}', [ProfesorController::class, 'update']);
+        Route::post('perfil/foto', [ProfesorController::class, 'uploadFotoMe']);
         Route::patch('estudiantes/{id}/aprobacion-curso', [EstudianteController::class, 'updateAprobacionCurso']);
     });
 
@@ -99,6 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('certificado', [CertificadoController::class, 'downloadMe']);
         Route::get('perfil', [EstudianteController::class, 'showMe']);
         Route::put('perfil', [EstudianteController::class, 'updateMe']);
+        Route::post('perfil/foto', [EstudianteController::class, 'uploadFotoMe']);
         Route::get('notificaciones', [NotificationController::class, 'index']);
         Route::get('notificaciones/count', [NotificationController::class, 'unreadCount']);
         Route::post('notificaciones/{id}/read', [NotificationController::class, 'markAsRead']);
