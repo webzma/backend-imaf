@@ -28,12 +28,11 @@ class CertificadoController extends Controller
 
     private function buildCertificadoResponse(Estudiante $estudiante)
     {
-        $aprobadoPorAdmin = $estudiante->estado_pago === 'aprobado';
-        $aprobadoPorProfesor = $estudiante->estado_aprobacion_curso === 'aprobado';
+        $aproboCurso = $estudiante->estado_aprobacion_curso === 'aprobado';
 
-        if (! $aprobadoPorAdmin && ! $aprobadoPorProfesor) {
+        if (! $aproboCurso) {
             return response()->json([
-                'message' => 'El estudiante no tiene una aprobación válida para generar certificado.',
+                'message' => 'El estudiante aún no ha aprobado el curso, por lo que no puede generar el certificado.',
             ], 422);
         }
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Profesor;
 use App\Models\TipoContrato;
 use App\Models\User;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -113,6 +114,44 @@ class ProfesorController extends Controller
         }
 
         $profesor->update(array_diff_key($data, array_flip(['name', 'email'])));
+
+        return response()->json($profesor->load('user', 'tipoContrato'));
+    }
+
+    public function uploadFotoMe(Request $request)
+    {
+        $request->validate([
+            'foto' => 'required|image|mimes:jpeg,jpg,png,webp|max:2048',
+        ]);
+
+        $profesor = Profesor::where('user_id', Auth::id())->firstOrFail();
+
+        try {
+            $upload = Cloudinary::uploadApi()->upload(
+                $request->file('foto')->getRealPath(),
+                [
+                    'folder' => 'imaf/perfiles',
+                    'public_id' => 'profesor_'.$profesor->id,
+                    'overwrite' => true,
+                    'invalidate' => true,
+                    'transformation' => [
+                        'width' => 400,
+                        'height' => 400,
+                        'crop' => 'fill',
+                        'gravity' => 'face',
+                    ],
+                ]
+            );
+        } catch (\Throwable $e) {
+            \Log::error('Error subiendo foto de profesor: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'No se pudo subir la imagen. Inténtalo de nuevo.',
+            ], 500);
+        }
+
+        $profesor->update(['foto' => $upload['secure_url']]);
+        $profesor->refresh();
 
         return response()->json($profesor->load('user', 'tipoContrato'));
     }

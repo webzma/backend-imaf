@@ -21,6 +21,7 @@ class Profesor extends Model
         'departamento',
         'fecha_nacimiento',
         'genero',
+        'foto',
         'tipo_contrato_id',
     ];
 

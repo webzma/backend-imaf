@@ -18,6 +18,7 @@ class Estudiante extends Model
         'municipio',
         'fecha_nacimiento',
         'genero',
+        'foto',
         'fecha_inscripcion',
         'estado',
         'estado_pago',
