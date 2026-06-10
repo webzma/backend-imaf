@@ -4,10 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Models\Curso;
 use App\Models\Sesion;
+use App\Notifications\GenericNotification;
 use Illuminate\Http\Request;
 
 class SesionController extends Controller
 {
+    private function notifyInstructor(string $cursoId, string $accion)
+    {
+        $curso = Curso::with('instructor.user')->find($cursoId);
+        if ($curso && $curso->instructor && $curso->instructor->user) {
+            $curso->instructor->user->notify(new GenericNotification(
+                'Horario Actualizado',
+                "El administrador ha {$accion} una sesión en el horario del curso: {$curso->nombre}.",
+                "/profesor/cursos/{$curso->id}"
+            ));
+        }
+    }
+
     public function index(string $cursoId)
     {
         Curso::findOrFail($cursoId);
@@ -59,6 +72,8 @@ class SesionController extends Controller
         $sesion = Sesion::create($data);
         $sesion->load(['curso.instructor.user']);
 
+        $this->notifyInstructor($data['curso_id'], 'agregado');
+
         return response()->json($sesion, 201);
     }
 
@@ -79,13 +94,18 @@ class SesionController extends Controller
         $sesion->update($data);
         $sesion->load(['curso.instructor.user']);
 
+        $this->notifyInstructor($sesion->curso_id, 'actualizado');
+
         return response()->json($sesion);
     }
 
     public function destroyGlobal(string $id)
     {
         $sesion = Sesion::findOrFail($id);
+        $cursoId = $sesion->curso_id;
         $sesion->delete();
+
+        $this->notifyInstructor($cursoId, 'eliminado');
 
         return response()->json(['message' => 'Sesión eliminada.']);
     }
@@ -105,6 +125,8 @@ class SesionController extends Controller
 
         $sesion = Sesion::create(['curso_id' => $cursoId, ...$data]);
 
+        $this->notifyInstructor($cursoId, 'agregado');
+
         return response()->json($sesion, 201);
     }
 
@@ -123,6 +145,8 @@ class SesionController extends Controller
 
         $sesion->update($data);
 
+        $this->notifyInstructor($cursoId, 'actualizado');
+
         return response()->json($sesion);
     }
 
@@ -130,6 +154,8 @@ class SesionController extends Controller
     {
         $sesion = Sesion::where('curso_id', $cursoId)->findOrFail($id);
         $sesion->delete();
+
+        $this->notifyInstructor($cursoId, 'eliminado');
 
         return response()->json(['message' => 'Sesión eliminada.']);
     }

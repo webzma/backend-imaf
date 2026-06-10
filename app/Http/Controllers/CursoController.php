@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Curso;
+use App\Models\Profesor;
+use App\Notifications\GenericNotification;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -39,6 +41,16 @@ class CursoController extends Controller
 
         $curso = Curso::create($data);
 
+        // Notificar al profesor asignado
+        $profesor = Profesor::with('user')->find($curso->profesor_id);
+        if ($profesor && $profesor->user) {
+            $profesor->user->notify(new GenericNotification(
+                'Asignación de Curso',
+                "Has sido asignado como instructor del curso: {$curso->nombre}.",
+                "/profesor/cursos/{$curso->id}"
+            ));
+        }
+
         return response()->json($curso->load('instructor'), 201);
     }
 
@@ -66,7 +78,34 @@ class CursoController extends Controller
             'estado' => 'in:activo,inactivo',
         ]);
 
+        $oldProfesorId = $curso->profesor_id;
+        $oldEstado = $curso->estado;
         $curso->update($data);
+
+        // Notificar al profesor si el estado del curso cambió
+        if (isset($data['estado']) && $data['estado'] !== $oldEstado) {
+            $profesor = Profesor::with('user')->find($curso->profesor_id);
+            if ($profesor && $profesor->user) {
+                $estadoTexto = $data['estado'] === 'activo' ? 'activado' : 'inactivado';
+                $profesor->user->notify(new GenericNotification(
+                    'Estado de Curso Actualizado',
+                    "El curso '{$curso->nombre}' ha sido {$estadoTexto} por el administrador.",
+                    "/profesor/cursos/{$curso->id}"
+                ));
+            }
+        }
+
+        // Si se cambió el profesor, notificar al nuevo profesor
+        if (isset($data['profesor_id']) && (int) $data['profesor_id'] !== (int) $oldProfesorId) {
+            $profesor = Profesor::with('user')->find($data['profesor_id']);
+            if ($profesor && $profesor->user) {
+                $profesor->user->notify(new GenericNotification(
+                    'Asignación de Curso',
+                    "Has sido asignado como instructor del curso: {$curso->nombre}.",
+                    "/profesor/cursos/{$curso->id}"
+                ));
+            }
+        }
 
         return response()->json($curso->load('instructor'));
     }

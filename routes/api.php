@@ -90,6 +90,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('perfil/{id}', [ProfesorController::class, 'update']);
         Route::post('perfil/foto', [ProfesorController::class, 'uploadFotoMe']);
         Route::patch('estudiantes/{id}/aprobacion-curso', [EstudianteController::class, 'updateAprobacionCurso']);
+        Route::get('notificaciones', [NotificationController::class, 'index']);
+        Route::get('notificaciones/count', [NotificationController::class, 'unreadCount']);
+        Route::post('notificaciones/{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('notificaciones/mark-all-read', [NotificationController::class, 'markAllAsRead']);
     });
 
     // Solo estudiante
