@@ -4,10 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Models\Curso;
 use App\Models\Temario;
+use App\Notifications\GenericNotification;
 use Illuminate\Http\Request;
 
 class TemarioController extends Controller
 {
+    private function notifyInstructor(string $cursoId, string $accion)
+    {
+        $curso = Curso::with('instructor.user')->find($cursoId);
+        if ($curso && $curso->instructor && $curso->instructor->user) {
+            $curso->instructor->user->notify(new GenericNotification(
+                'Temario Actualizado',
+                "El administrador ha {$accion} un tema en el temario del curso: {$curso->nombre}.",
+                "/profesor/cursos/{$curso->id}"
+            ));
+        }
+    }
+
     public function index(string $cursoId)
     {
         Curso::findOrFail($cursoId);
@@ -33,6 +46,8 @@ class TemarioController extends Controller
 
         $temario = Temario::create(['curso_id' => $cursoId, ...$data]);
 
+        $this->notifyInstructor($cursoId, 'agregado');
+
         return response()->json($temario, 201);
     }
 
@@ -48,6 +63,8 @@ class TemarioController extends Controller
 
         $temario->update($data);
 
+        $this->notifyInstructor($cursoId, 'actualizado');
+
         return response()->json($temario);
     }
 
@@ -55,6 +72,8 @@ class TemarioController extends Controller
     {
         $temario = Temario::where('curso_id', $cursoId)->findOrFail($id);
         $temario->delete();
+
+        $this->notifyInstructor($cursoId, 'eliminado');
 
         return response()->json(['message' => 'Tema eliminado.']);
     }
