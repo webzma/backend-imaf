@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Curso;
+use App\Models\Profesor;
 use App\Models\Sesion;
 use App\Notifications\GenericNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class SesionController extends Controller
 {
@@ -49,6 +51,33 @@ class SesionController extends Controller
             $query->whereHas('curso', function ($q) use ($request) {
                 $q->where('profesor_id', $request->input('instructor_id'));
             });
+        }
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->input('estado'));
+        }
+
+        return response()->json($query->get());
+    }
+
+    public function horarioProfesor(Request $request)
+    {
+        $profesor = Profesor::where('user_id', Auth::id())->firstOrFail();
+
+        $query = Sesion::with(['curso.instructor.user'])
+            ->whereHas('curso', function ($q) use ($profesor) {
+                $q->where('profesor_id', $profesor->id);
+            })
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio');
+
+        if ($request->filled('desde')) {
+            $query->whereDate('fecha', '>=', $request->input('desde'));
+        }
+        if ($request->filled('hasta')) {
+            $query->whereDate('fecha', '<=', $request->input('hasta'));
+        }
+        if ($request->filled('curso_id')) {
+            $query->where('curso_id', $request->input('curso_id'));
         }
         if ($request->filled('estado')) {
             $query->where('estado', $request->input('estado'));
