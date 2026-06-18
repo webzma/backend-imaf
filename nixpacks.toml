@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["php84", "php84Packages.composer", "git", "nodejs", "nodePackages.pnpm", "php84Extensions.pdo", "php84Extensions.pdo_mysql", "php84Extensions.mbstring", "php84Extensions.tokenizer", "php84Extensions.xml", "php84Extensions.ctype", "php84Extensions.fileinfo", "php84Extensions.bcmath"]
+nixPkgs = ["php84", "php84Packages.composer", "git", "nodejs", "nodePackages.pnpm", "php84Extensions.pdo", "php84Extensions.pdo_mysql", "php84Extensions.openssl", "php84Extensions.mbstring", "php84Extensions.tokenizer", "php84Extensions.xml", "php84Extensions.ctype", "php84Extensions.fileinfo", "php84Extensions.bcmath"]
 
 [phases.build]
 cmds = [
