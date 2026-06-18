@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Estudiante;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
