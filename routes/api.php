@@ -89,6 +89,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:profesor')->prefix('profesor')->group(function () {
         Route::put('perfil/{id}', [ProfesorController::class, 'update']);
         Route::post('perfil/foto', [ProfesorController::class, 'uploadFotoMe']);
+
+        // Cronograma / Horario del instructor (solo sus sesiones)
+        Route::get('horario', [SesionController::class, 'horarioProfesor']);
         Route::patch('estudiantes/{id}/aprobacion-curso', [EstudianteController::class, 'updateAprobacionCurso']);
         Route::get('notificaciones', [NotificationController::class, 'index']);
         Route::get('notificaciones/count', [NotificationController::class, 'unreadCount']);
