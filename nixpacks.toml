@@ -1,8 +1,11 @@
 [phases.setup]
-nixPkgs = ["php84", "php84Packages.composer", "git", "nodejs", "nodePackages.pnpm", "php84Extensions.pdo", "php84Extensions.pdo_mysql", "php84Extensions.openssl", "php84Extensions.mbstring", "php84Extensions.tokenizer", "php84Extensions.xml", "php84Extensions.ctype", "php84Extensions.fileinfo", "php84Extensions.bcmath"]
+nixPkgs = ["php84", "php84Packages.composer", "git", "nodejs", "nodePackages.pnpm"]
 
 [phases.build]
 cmds = [
+  # Verifica que openssl esté cargado (mysqlnd lo necesita para caching_sha2_password de MySQL 8/9).
+  # Falla el build aquí con un mensaje claro en vez de morir luego en 'migrate'.
+  "php -m | grep -qi openssl || (echo 'ERROR: la extension openssl de PHP no esta cargada' && php -m && exit 1)",
   # Reintenta la descarga via dist (API de GitHub) y, si falla por 504/rate-limit,
   # cae a clonar por git (--prefer-source), que no depende de api.github.com.
   "composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist || composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist || composer install --no-dev --optimize-autoloader --no-interaction --prefer-source",
