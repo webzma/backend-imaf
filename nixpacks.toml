@@ -9,10 +9,13 @@ cmds = [
   # Reintenta la descarga via dist (API de GitHub) y, si falla por 504/rate-limit,
   # cae a clonar por git (--prefer-source), que no depende de api.github.com.
   "composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist || composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist || composer install --no-dev --optimize-autoloader --no-interaction --prefer-source",
-  "php artisan config:cache",
-  "php artisan route:cache",
-  "php artisan view:cache"
+  # NO se cachea la config en build: en este punto los secretos (APP_KEY, DB_*, etc.)
+  # no estan disponibles y se hornearian valores nulos en bootstrap/cache/config.php.
+  # config:cache se ejecuta en 'start', cuando las variables de entorno ya estan inyectadas.
+  # route:cache y view:cache no dependen de secretos, asi que se quedan en build.
+  "php artisan view:cache",
+  "php artisan route:cache"
 ]
 
 [start]
-cmd = "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=$PORT"
+cmd = "php artisan config:cache && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=$PORT"
