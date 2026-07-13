@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Curso;
 use App\Models\Profesor;
 use App\Notifications\GenericNotification;
+use App\Services\CursoEstadoService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -12,11 +13,15 @@ class CursoController extends Controller
 {
     public function index()
     {
+        CursoEstadoService::sincronizarConCache();
+
         return response()->json(Curso::with('instructor.user', 'estudiantes.user')->get());
     }
 
     public function indexActivos()
     {
+        CursoEstadoService::sincronizarConCache();
+
         return response()->json(
             Curso::with('instructor.user', 'estudiantes.user')
                 ->where('estado', 'activo')
@@ -30,6 +35,7 @@ class CursoController extends Controller
             'profesor_id' => ['required', Rule::exists('profesores', 'id')],
             'nombre' => 'required|string|max:255',
             'limite_cupo' => 'required|integer|min:1',
+            'minimo_estudiantes' => 'nullable|integer|min:1|lte:limite_cupo',
             'fecha_inicio' => 'nullable|date',
             'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
             'descripcion' => 'nullable|string',
@@ -69,6 +75,7 @@ class CursoController extends Controller
             'profesor_id' => ['sometimes', Rule::exists('profesores', 'id')],
             'nombre' => 'sometimes|string|max:255',
             'limite_cupo' => 'sometimes|integer|min:1',
+            'minimo_estudiantes' => 'nullable|integer|min:1',
             'fecha_inicio' => 'nullable|date',
             'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
             'descripcion' => 'nullable|string',

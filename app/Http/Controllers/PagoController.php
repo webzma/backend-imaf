@@ -37,13 +37,22 @@ class PagoController extends Controller
     {
         $request->validate([
             'curso_id' => 'required|exists:cursos,id',
-            'referencia' => 'required|string|max:100',
+            'referencia' => ['required', 'string', 'max:100', 'regex:/^[0-9]+$/'],
             'banco_origen' => 'nullable|string|max:100',
             'comprobante' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+        ], [
+            'referencia.regex' => 'El número de referencia solo puede contener dígitos numéricos.',
         ]);
 
         $user = $request->user();
         $curso = Curso::findOrFail($request->curso_id);
+
+        $finalizado = $curso->fecha_fin && $curso->fecha_fin->isPast();
+        if ($curso->estado !== 'activo' || $finalizado) {
+            return response()->json([
+                'message' => 'El curso no está disponible para inscripciones.',
+            ], 422);
+        }
 
         if ($curso->cupos_restantes <= 0) {
             return response()->json([

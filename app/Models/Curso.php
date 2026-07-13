@@ -15,6 +15,7 @@ class Curso extends Model
         'profesor_id',
         'nombre',
         'limite_cupo',
+        'minimo_estudiantes',
         'fecha_inicio',
         'fecha_fin',
         'descripcion',

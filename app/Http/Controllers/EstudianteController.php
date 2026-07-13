@@ -43,18 +43,18 @@ class EstudianteController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => ['required', 'string', 'max:255', self::REGEX_ALFABETICO],
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8',
             'curso_id' => 'nullable|exists:cursos,id',
-            'cedula' => 'required|string|unique:estudiantes,cedula',
-            'telefono' => 'nullable|string|max:20',
+            'cedula' => ['required', 'string', 'max:15', 'unique:estudiantes,cedula', self::REGEX_NUMERICO],
+            'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
             'fecha_inscripcion' => 'required|date',
             'estado' => 'in:activo,inactivo,graduado',
-        ]);
+        ], $this->mensajesTipoDato());
 
         $estudiante = DB::transaction(function () use ($request) {
             $user = User::create([
@@ -153,11 +153,11 @@ class EstudianteController extends Controller
         $id = $estudiante->id;
 
         $data = $request->validate([
-            'telefono' => 'nullable|string|max:20',
+            'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
-        ]);
+        ], $this->mensajesTipoDato());
 
         $estudiante->update($data);
         $estudiante->refresh();
@@ -216,15 +216,15 @@ class EstudianteController extends Controller
 
         $data = $request->validate([
             'curso_id' => 'nullable|exists:cursos,id',
-            'nombre' => 'sometimes|string|max:255',
-            'cedula' => 'sometimes|string|unique:estudiantes,cedula,'.$id,
-            'telefono' => 'nullable|string|max:20',
+            'nombre' => ['sometimes', 'string', 'max:255', self::REGEX_ALFABETICO],
+            'cedula' => ['sometimes', 'string', 'max:15', 'unique:estudiantes,cedula,'.$id, self::REGEX_NUMERICO],
+            'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
             'fecha_inscripcion' => 'sometimes|date',
             'estado' => 'in:activo,inactivo,graduado',
-        ]);
+        ], $this->mensajesTipoDato());
 
         $estudiante->update($data);
 

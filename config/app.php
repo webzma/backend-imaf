@@ -56,6 +56,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | La URL base del frontend (Next.js). Se usa para construir enlaces que
+    | apuntan a la interfaz del usuario, como el enlace de restablecimiento
+    | de contraseña que se envía por correo. Por defecto usa APP_URL.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
