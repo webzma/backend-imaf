@@ -26,11 +26,11 @@ class ProfesorController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => ['required', 'string', 'max:255', self::REGEX_ALFABETICO],
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8',
-            'cedula' => 'required|string|unique:profesores,cedula',
-            'telefono' => 'nullable|string|max:20',
+            'cedula' => ['required', 'string', 'max:15', 'unique:profesores,cedula', self::REGEX_NUMERICO],
+            'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
             'especialidad' => 'nullable|string|max:255',
             'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
@@ -38,7 +38,7 @@ class ProfesorController extends Controller
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
             'tipo_contrato_id' => 'required|exists:tipo_contratos,id',
-        ]);
+        ], $this->mensajesTipoDato());
 
         $profesor = DB::transaction(function () use ($request) {
             $user = User::create([
@@ -85,8 +85,8 @@ class ProfesorController extends Controller
         }
 
         $rules = [
-            'cedula' => 'sometimes|string|unique:profesores,cedula,'.$id,
-            'telefono' => 'nullable|string|max:20',
+            'cedula' => ['sometimes', 'string', 'max:15', 'unique:profesores,cedula,'.$id, self::REGEX_NUMERICO],
+            'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
             'especialidad' => 'nullable|string|max:255',
             'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
@@ -97,11 +97,11 @@ class ProfesorController extends Controller
         ];
 
         if ($isAdmin) {
-            $rules['name'] = 'sometimes|string|max:255';
+            $rules['name'] = ['sometimes', 'string', 'max:255', self::REGEX_ALFABETICO];
             $rules['email'] = 'sometimes|email|unique:users,email,'.$profesor->user_id;
         }
 
-        $data = $request->validate($rules);
+        $data = $request->validate($rules, $this->mensajesTipoDato());
 
         if ($isAdmin) {
             $userFields = array_filter(

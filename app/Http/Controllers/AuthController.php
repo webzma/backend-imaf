@@ -14,15 +14,15 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => ['required', 'string', 'max:255', self::REGEX_ALFABETICO],
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'cedula' => 'required|string|unique:estudiantes,cedula',
-            'telefono' => 'required|string|max:20',
+            'cedula' => ['required', 'string', 'max:15', 'unique:estudiantes,cedula', self::REGEX_NUMERICO],
+            'telefono' => ['required', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'required|date',
             'genero' => 'required|in:masculino,femenino,otro',
-        ]);
+        ], $this->mensajesTipoDato());
 
         $user = DB::transaction(function () use ($request) {
             $user = User::create([
@@ -69,6 +69,10 @@ class AuthController extends Controller
                 'email' => ['Las credenciales son incorrectas.'],
             ]);
         }
+
+        // Sesión única: al iniciar sesión se revocan los tokens anteriores,
+        // por lo que cualquier otra sesión activa del usuario queda invalidada.
+        $user->tokens()->delete();
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
