@@ -35,7 +35,7 @@ class ResetPasswordNotification extends Notification
 
         $expira = config('auth.passwords.'.config('auth.defaults.passwords').'.expire', 60);
 
-        return (new MailMessage)
+        return (new MailMessage())
             ->subject('Restablece tu contraseña · IMAF')
             ->greeting('Hola '.$notifiable->name)
             ->line('Recibimos una solicitud para restablecer la contraseña de tu cuenta.')
