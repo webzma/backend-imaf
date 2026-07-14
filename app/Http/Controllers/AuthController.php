@@ -17,7 +17,7 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:255', self::REGEX_ALFABETICO],
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'cedula' => ['required', 'string', 'max:15', 'unique:estudiantes,cedula', self::REGEX_NUMERICO],
+            'cedula' => ['required', 'string', 'max:15', 'unique:estudiantes,cedula', self::REGEX_CEDULA],
             'telefono' => ['required', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'required|date',
