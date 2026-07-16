@@ -8,9 +8,67 @@ use App\Models\Sesion;
 use App\Notifications\GenericNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class SesionController extends Controller
 {
+    /**
+     * Lanza un error 422 si el instructor del curso ya tiene otra clase
+     * (no cancelada) que se solape en fecha y hora.
+     */
+    private function validarConflictoInstructor(
+        int|string $cursoId,
+        string $fecha,
+        ?string $horaInicio,
+        ?string $horaFin,
+        ?int $ignorarSesionId = null,
+    ): void {
+        $curso = Curso::find($cursoId);
+        if (! $curso || ! $curso->profesor_id) {
+            return;
+        }
+
+        $candidatas = Sesion::whereDate('fecha', $fecha)
+            ->where('estado', '!=', 'cancelada')
+            ->whereHas('curso', fn ($q) => $q->where('profesor_id', $curso->profesor_id))
+            ->when($ignorarSesionId, fn ($q) => $q->where('id', '!=', $ignorarSesionId))
+            ->get();
+
+        [$inicio, $fin] = $this->rangoEnMinutos($horaInicio, $horaFin);
+
+        foreach ($candidatas as $sesion) {
+            [$sInicio, $sFin] = $this->rangoEnMinutos($sesion->hora_inicio, $sesion->hora_fin);
+
+            if ($inicio < $sFin && $sInicio < $fin) {
+                $horario = $sesion->hora_inicio
+                    ? ' ('.substr($sesion->hora_inicio, 0, 5).($sesion->hora_fin ? '–'.substr($sesion->hora_fin, 0, 5) : '').')'
+                    : '';
+
+                throw ValidationException::withMessages([
+                    'hora_inicio' => "El instructor ya tiene una clase ese día en ese horario: \"{$sesion->titulo}\"{$horario}.",
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Convierte el rango horario a minutos del día. Sin hora de inicio la
+     * sesión ocupa todo el día; sin hora de fin se asume una hora de duración.
+     */
+    private function rangoEnMinutos(?string $horaInicio, ?string $horaFin): array
+    {
+        if (! $horaInicio) {
+            return [0, 1440];
+        }
+
+        $aMinutos = fn (string $h) => ((int) substr($h, 0, 2)) * 60 + (int) substr($h, 3, 2);
+
+        $inicio = $aMinutos($horaInicio);
+        $fin = $horaFin ? $aMinutos($horaFin) : $inicio + 60;
+
+        return [$inicio, $fin];
+    }
+
     private function notifyInstructor(string $cursoId, string $accion)
     {
         $curso = Curso::with('instructor.user')->find($cursoId);
@@ -98,6 +156,15 @@ class SesionController extends Controller
             'estado' => 'in:programada,realizada,cancelada',
         ]);
 
+        if (($data['estado'] ?? 'programada') !== 'cancelada') {
+            $this->validarConflictoInstructor(
+                $data['curso_id'],
+                $data['fecha'],
+                $data['hora_inicio'] ?? null,
+                $data['hora_fin'] ?? null,
+            );
+        }
+
         $sesion = Sesion::create($data);
         $sesion->load(['curso.instructor.user']);
 
@@ -119,6 +186,17 @@ class SesionController extends Controller
             'hora_fin' => 'nullable|date_format:H:i|after:hora_inicio',
             'estado' => 'in:programada,realizada,cancelada',
         ]);
+
+        $estadoFinal = $data['estado'] ?? $sesion->estado;
+        if ($estadoFinal !== 'cancelada') {
+            $this->validarConflictoInstructor(
+                $data['curso_id'] ?? $sesion->curso_id,
+                $data['fecha'] ?? $sesion->fecha->format('Y-m-d'),
+                array_key_exists('hora_inicio', $data) ? $data['hora_inicio'] : $sesion->hora_inicio,
+                array_key_exists('hora_fin', $data) ? $data['hora_fin'] : $sesion->hora_fin,
+                $sesion->id,
+            );
+        }
 
         $sesion->update($data);
         $sesion->load(['curso.instructor.user']);
@@ -152,6 +230,15 @@ class SesionController extends Controller
             'estado' => 'in:programada,realizada,cancelada',
         ]);
 
+        if (($data['estado'] ?? 'programada') !== 'cancelada') {
+            $this->validarConflictoInstructor(
+                $cursoId,
+                $data['fecha'],
+                $data['hora_inicio'] ?? null,
+                $data['hora_fin'] ?? null,
+            );
+        }
+
         $sesion = Sesion::create(['curso_id' => $cursoId, ...$data]);
 
         $this->notifyInstructor($cursoId, 'agregado');
@@ -171,6 +258,17 @@ class SesionController extends Controller
             'hora_fin' => 'nullable|date_format:H:i|after:hora_inicio',
             'estado' => 'in:programada,realizada,cancelada',
         ]);
+
+        $estadoFinal = $data['estado'] ?? $sesion->estado;
+        if ($estadoFinal !== 'cancelada') {
+            $this->validarConflictoInstructor(
+                $cursoId,
+                $data['fecha'] ?? $sesion->fecha->format('Y-m-d'),
+                array_key_exists('hora_inicio', $data) ? $data['hora_inicio'] : $sesion->hora_inicio,
+                array_key_exists('hora_fin', $data) ? $data['hora_fin'] : $sesion->hora_fin,
+                $sesion->id,
+            );
+        }
 
         $sesion->update($data);
 

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asistencia;
 use App\Models\Estudiante;
+use App\Models\Sesion;
 use App\Models\User;
 use App\Notifications\SolicitudCursoProcesada;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
@@ -273,6 +275,27 @@ class EstudianteController extends Controller
         $data = $request->validate([
             'estado_aprobacion_curso' => 'required|in:pendiente,aprobado,reprobado',
         ]);
+
+        // Solo se puede aprobar si asistió a todas las sesiones realizadas del curso
+        if ($data['estado_aprobacion_curso'] === 'aprobado') {
+            $sesionesRealizadas = Sesion::where('curso_id', $curso->id)
+                ->where('estado', 'realizada')
+                ->pluck('id');
+
+            $presentes = Asistencia::where('estudiante_id', $estudiante->id)
+                ->whereIn('sesion_id', $sesionesRealizadas)
+                ->where('presente', true)
+                ->count();
+
+            $faltas = $sesionesRealizadas->count() - $presentes;
+
+            if ($faltas > 0) {
+                return response()->json([
+                    'message' => "No se puede aprobar: el estudiante no cumplió con toda la asistencia (faltó a {$faltas} de {$sesionesRealizadas->count()} ".
+                        ($sesionesRealizadas->count() === 1 ? 'sesión realizada' : 'sesiones realizadas').').',
+                ], 422);
+            }
+        }
 
         $estudiante->update($data);
 

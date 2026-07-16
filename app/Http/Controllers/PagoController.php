@@ -32,16 +32,18 @@ class PagoController extends Controller
         return response()->json($query->paginate(10));
     }
 
-    // Estudiante: enviar comprobante de pago para inscribirse
+    // Estudiante: reportar un pago (transferencia, pago móvil o efectivo) para inscribirse
     public function store(Request $request)
     {
         $request->validate([
             'curso_id' => 'required|exists:cursos,id',
-            'referencia' => ['required', 'string', 'max:100', 'regex:/^[0-9]+$/'],
+            'metodo_pago' => 'required|in:transferencia,pago_movil,efectivo',
+            'referencia' => ['exclude_if:metodo_pago,efectivo', 'required', 'string', 'max:100', 'regex:/^[0-9]+$/'],
             'banco_origen' => 'nullable|string|max:100',
-            'comprobante' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'comprobante' => ['exclude_if:metodo_pago,efectivo', 'required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:5120'],
         ], [
             'referencia.regex' => 'El número de referencia solo puede contener dígitos numéricos.',
+            'metodo_pago.in' => 'El método de pago debe ser transferencia, pago móvil o efectivo.',
         ]);
 
         $user = $request->user();
@@ -72,26 +74,42 @@ class PagoController extends Controller
             ], 422);
         }
 
-        $uploadedFile = Cloudinary::uploadApi()->upload(
-            $request->file('comprobante')->getRealPath(),
-            ['folder' => 'imaf/comprobantes']
-        );
+        $comprobanteId = null;
+        if ($request->hasFile('comprobante')) {
+            $uploadedFile = Cloudinary::uploadApi()->upload(
+                $request->file('comprobante')->getRealPath(),
+                ['folder' => 'imaf/comprobantes']
+            );
+            $comprobanteId = $uploadedFile['public_id'];
+        }
+
+        $esEfectivo = $request->metodo_pago === 'efectivo';
 
         $pago = Pago::create([
             'user_id' => $user->id,
             'curso_id' => $request->curso_id,
-            'referencia' => $request->referencia,
-            'banco_origen' => $request->banco_origen,
-            'comprobante' => $uploadedFile['public_id'],
+            'metodo_pago' => $request->metodo_pago,
+            'referencia' => $esEfectivo ? null : $request->referencia,
+            'banco_origen' => $esEfectivo ? null : $request->banco_origen,
+            'comprobante' => $comprobanteId,
             'estado' => 'pendiente',
         ]);
+
+        // El estudiante queda pendiente por pago hasta que el admin verifique
+        Estudiante::where('user_id', $user->id)->update(['estado_pago' => 'pendiente']);
+
+        $metodoLabel = [
+            'transferencia' => 'transferencia',
+            'pago_movil' => 'pago móvil',
+            'efectivo' => 'efectivo',
+        ][$request->metodo_pago];
 
         // Notificar a los administradores
         $admins = User::where('role', 'admin')->get();
         foreach ($admins as $admin) {
             $admin->notify(new GenericNotification(
                 'Nueva Solicitud de Pago',
-                "El estudiante {$user->name} ha solicitado inscribirse en {$curso->nombre}.",
+                "El estudiante {$user->name} ha solicitado inscribirse en {$curso->nombre} (pago vía {$metodoLabel}).",
                 '/admin/pagos'
             ));
         }
@@ -208,7 +226,9 @@ class PagoController extends Controller
     public function destroy(string $id)
     {
         $pago = Pago::findOrFail($id);
-        Cloudinary::uploadApi()->destroy($pago->comprobante);
+        if (! empty($pago->comprobante)) {
+            Cloudinary::uploadApi()->destroy($pago->comprobante);
+        }
         $pago->forceDelete();
 
         return response()->json(['message' => 'Pago eliminado.']);
@@ -222,6 +242,7 @@ class PagoController extends Controller
 
         return [
             'id' => $pago->id,
+            'metodo_pago' => $pago->metodo_pago,
             'referencia' => $pago->referencia,
             'banco_origen' => $pago->banco_origen,
             'comprobante' => $pago->comprobante,
