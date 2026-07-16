@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Curso;
 use App\Models\Profesor;
 use App\Notifications\GenericNotification;
+use App\Rules\DiaHabil;
 use App\Services\CursoEstadoService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -36,8 +37,8 @@ class CursoController extends Controller
             'nombre' => 'required|string|max:255',
             'limite_cupo' => 'required|integer|min:1',
             'minimo_estudiantes' => 'nullable|integer|min:1|lte:limite_cupo',
-            'fecha_inicio' => 'nullable|date',
-            'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
+            'fecha_inicio' => ['nullable', 'date', new DiaHabil],
+            'fecha_fin' => ['nullable', 'date', 'after_or_equal:fecha_inicio', new DiaHabil],
             'descripcion' => 'nullable|string',
             'requisitos' => 'nullable|string',
             'precio' => 'required|numeric|min:0',

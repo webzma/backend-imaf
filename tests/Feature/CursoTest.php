@@ -77,6 +77,72 @@ class CursoTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors('profesor_id');
     }
 
+    private function payloadCurso(array $overrides = []): array
+    {
+        $profesor = Profesor::factory()->create();
+
+        return array_merge([
+            'profesor_id' => $profesor->id,
+            'nombre' => 'Curso de prueba',
+            'limite_cupo' => 20,
+            'precio' => 100,
+            'estado' => 'activo',
+        ], $overrides);
+    }
+
+    public function test_crear_curso_falla_si_fecha_inicio_es_sabado(): void
+    {
+        $this->actingAsAdmin();
+
+        // 2026-09-05 es sábado
+        $this->postJson('/api/admin/cursos', $this->payloadCurso([
+            'fecha_inicio' => '2026-09-05',
+        ]))->assertStatus(422)->assertJsonValidationErrors('fecha_inicio');
+    }
+
+    public function test_crear_curso_falla_si_fecha_fin_es_domingo(): void
+    {
+        $this->actingAsAdmin();
+
+        // 2026-09-06 es domingo
+        $this->postJson('/api/admin/cursos', $this->payloadCurso([
+            'fecha_inicio' => '2026-09-01',
+            'fecha_fin' => '2026-09-06',
+        ]))->assertStatus(422)->assertJsonValidationErrors('fecha_fin');
+    }
+
+    public function test_crear_curso_falla_si_fecha_inicio_es_feriado_fijo(): void
+    {
+        $this->actingAsAdmin();
+
+        // 2026-07-24 (viernes) es el Natalicio de Simón Bolívar
+        $this->postJson('/api/admin/cursos', $this->payloadCurso([
+            'fecha_inicio' => '2026-07-24',
+        ]))->assertStatus(422)->assertJsonValidationErrors('fecha_inicio');
+    }
+
+    public function test_crear_curso_falla_si_fecha_inicio_es_feriado_movil(): void
+    {
+        $this->actingAsAdmin();
+
+        // 2026-04-03 es Viernes Santo (Pascua 2026 = 5 de abril)
+        $this->postJson('/api/admin/cursos', $this->payloadCurso([
+            'fecha_inicio' => '2026-04-03',
+        ]))->assertStatus(422)->assertJsonValidationErrors('fecha_inicio');
+    }
+
+    public function test_crear_curso_acepta_dias_habiles(): void
+    {
+        Notification::fake();
+        $this->actingAsAdmin();
+
+        // Lunes 2026-09-07 y viernes 2026-09-11, ninguno feriado
+        $this->postJson('/api/admin/cursos', $this->payloadCurso([
+            'fecha_inicio' => '2026-09-07',
+            'fecha_fin' => '2026-09-11',
+        ]))->assertCreated();
+    }
+
     public function test_admin_puede_ver_un_curso(): void
     {
         $this->actingAsAdmin();
