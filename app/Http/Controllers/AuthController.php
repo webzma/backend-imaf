@@ -14,7 +14,10 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'name' => ['required', 'string', 'max:255', self::REGEX_ALFABETICO],
+            'primer_nombre' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
+            'segundo_nombre' => ['nullable', 'string', 'max:100', self::REGEX_NOMBRES],
+            'primer_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
+            'segundo_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'cedula' => ['required', 'string', 'max:15', 'unique:estudiantes,cedula', self::REGEX_CEDULA],
@@ -26,7 +29,10 @@ class AuthController extends Controller
 
         $user = DB::transaction(function () use ($request) {
             $user = User::create([
-                'name' => $request->name,
+                'primer_nombre' => $request->primer_nombre,
+                'segundo_nombre' => $request->segundo_nombre,
+                'primer_apellido' => $request->primer_apellido,
+                'segundo_apellido' => $request->segundo_apellido,
                 'email' => $request->email,
                 'password' => $request->password,
                 'role' => 'estudiante',
@@ -34,7 +40,7 @@ class AuthController extends Controller
 
             Estudiante::create([
                 'user_id' => $user->id,
-                'nombre' => $request->name,
+                'nombre' => $user->name,
                 'cedula' => $request->cedula,
                 'telefono' => $request->telefono,
                 'municipio' => $request->municipio,

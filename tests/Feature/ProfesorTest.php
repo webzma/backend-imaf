@@ -37,15 +37,19 @@ class ProfesorTest extends TestCase
         $tipo = TipoContrato::create(['nombre' => 'Tiempo completo']);
 
         $response = $this->postJson('/api/admin/profesores', [
-            'name' => 'Carlos Ruiz',
+            'primer_nombre' => 'Carlos',
+            'segundo_nombre' => 'Alberto',
+            'primer_apellido' => 'Ruiz',
+            'segundo_apellido' => 'Díaz',
             'email' => 'carlos@example.com',
             'password' => 'password123',
             'cedula' => '001-4444444-4',
             'tipo_contrato_id' => $tipo->id,
         ]);
 
-        $response->assertCreated();
-        $this->assertDatabaseHas('users', ['email' => 'carlos@example.com', 'role' => 'profesor']);
+        $response->assertCreated()
+            ->assertJsonFragment(['primer_nombre' => 'Carlos', 'segundo_apellido' => 'Díaz']);
+        $this->assertDatabaseHas('users', ['email' => 'carlos@example.com', 'role' => 'profesor', 'name' => 'Carlos Alberto Ruiz Díaz']);
         $this->assertDatabaseHas('profesores', ['cedula' => '001-4444444-4']);
     }
 
@@ -54,7 +58,9 @@ class ProfesorTest extends TestCase
         $this->actingAsAdmin();
 
         $this->postJson('/api/admin/profesores', [
-            'name' => 'Sin contrato',
+            'primer_nombre' => 'Sin',
+            'primer_apellido' => 'Contrato',
+            'segundo_apellido' => 'Contrato',
             'email' => 'sincontrato@example.com',
             'password' => 'password123',
             'cedula' => '001-5555555-5',
