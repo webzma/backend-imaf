@@ -26,7 +26,10 @@ class ProfesorController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => ['required', 'string', 'max:255', self::REGEX_ALFABETICO],
+            'primer_nombre' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
+            'segundo_nombre' => ['nullable', 'string', 'max:100', self::REGEX_NOMBRES],
+            'primer_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
+            'segundo_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8',
             'cedula' => ['required', 'string', 'max:15', 'unique:profesores,cedula', self::REGEX_CEDULA],
@@ -42,7 +45,10 @@ class ProfesorController extends Controller
 
         $profesor = DB::transaction(function () use ($request) {
             $user = User::create([
-                'name' => $request->name,
+                'primer_nombre' => $request->primer_nombre,
+                'segundo_nombre' => $request->segundo_nombre,
+                'primer_apellido' => $request->primer_apellido,
+                'segundo_apellido' => $request->segundo_apellido,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'role' => 'profesor',
@@ -97,23 +103,27 @@ class ProfesorController extends Controller
         ];
 
         if ($isAdmin) {
-            $rules['name'] = ['sometimes', 'string', 'max:255', self::REGEX_ALFABETICO];
+            $rules['primer_nombre'] = ['sometimes', 'string', 'max:100', self::REGEX_NOMBRES];
+            $rules['segundo_nombre'] = ['nullable', 'string', 'max:100', self::REGEX_NOMBRES];
+            $rules['primer_apellido'] = ['sometimes', 'string', 'max:100', self::REGEX_NOMBRES];
+            $rules['segundo_apellido'] = ['sometimes', 'string', 'max:100', self::REGEX_NOMBRES];
             $rules['email'] = 'sometimes|email|unique:users,email,'.$profesor->user_id;
         }
 
         $data = $request->validate($rules, $this->mensajesTipoDato());
 
         if ($isAdmin) {
-            $userFields = array_filter(
-                array_intersect_key($data, array_flip(['name', 'email'])),
-                fn ($v) => $v !== null,
-            );
+            $userFields = array_intersect_key($data, array_flip([
+                'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email',
+            ]));
             if (! empty($userFields)) {
                 $profesor->user->update($userFields);
             }
         }
 
-        $profesor->update(array_diff_key($data, array_flip(['name', 'email'])));
+        $profesor->update(array_diff_key($data, array_flip([
+            'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email',
+        ])));
 
         return response()->json($profesor->load('user', 'tipoContrato'));
     }

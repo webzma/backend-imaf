@@ -39,7 +39,10 @@ class EstudianteTest extends TestCase
         $this->actingAsAdmin();
 
         $response = $this->postJson('/api/admin/estudiantes', [
-            'name' => 'María López',
+            'primer_nombre' => 'María',
+            'segundo_nombre' => 'Elena',
+            'primer_apellido' => 'López',
+            'segundo_apellido' => 'Gómez',
             'email' => 'maria@example.com',
             'password' => 'password123',
             'cedula' => '001-2222222-2',
@@ -48,7 +51,8 @@ class EstudianteTest extends TestCase
         ]);
 
         $response->assertCreated()
-            ->assertJsonFragment(['nombre' => 'María López']);
+            ->assertJsonFragment(['nombre' => 'María Elena López Gómez'])
+            ->assertJsonFragment(['primer_nombre' => 'María', 'segundo_apellido' => 'Gómez']);
 
         $this->assertDatabaseHas('users', [
             'email' => 'maria@example.com',
@@ -66,7 +70,9 @@ class EstudianteTest extends TestCase
         Estudiante::factory()->create(['cedula' => '001-3333333-3']);
 
         $this->postJson('/api/admin/estudiantes', [
-            'name' => 'Pedro',
+            'primer_nombre' => 'Pedro',
+            'primer_apellido' => 'Apellido',
+            'segundo_apellido' => 'Apellido',
             'email' => 'pedro@example.com',
             'password' => 'password123',
             'cedula' => '001-3333333-3',

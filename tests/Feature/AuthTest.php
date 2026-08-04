@@ -14,7 +14,10 @@ class AuthTest extends TestCase
     public function test_register_crea_usuario_estudiante_y_devuelve_token(): void
     {
         $response = $this->postJson('/api/register', [
-            'name' => 'Juan Pérez',
+            'primer_nombre' => 'Juan',
+            'segundo_nombre' => 'Pablo',
+            'primer_apellido' => 'Pérez',
+            'segundo_apellido' => 'Gómez',
             'email' => 'juan@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
@@ -26,7 +29,9 @@ class AuthTest extends TestCase
         ]);
 
         $response->assertCreated()
-            ->assertJsonStructure(['user' => ['id', 'name', 'email'], 'token']);
+            ->assertJsonStructure(['user' => ['id', 'name', 'email', 'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido'], 'token'])
+            ->assertJsonFragment(['name' => 'Juan Pablo Pérez Gómez'])
+            ->assertJsonFragment(['primer_nombre' => 'Juan', 'segundo_apellido' => 'Gómez']);
 
         $this->assertDatabaseHas('users', [
             'email' => 'juan@example.com',
@@ -43,7 +48,9 @@ class AuthTest extends TestCase
         User::factory()->create(['email' => 'dup@example.com']);
 
         $response = $this->postJson('/api/register', [
-            'name' => 'Otro',
+            'primer_nombre' => 'Otro',
+            'primer_apellido' => 'Apellido',
+            'segundo_apellido' => 'Apellido',
             'email' => 'dup@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',

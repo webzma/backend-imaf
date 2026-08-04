@@ -45,7 +45,10 @@ class EstudianteController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => ['required', 'string', 'max:255', self::REGEX_ALFABETICO],
+            'primer_nombre' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
+            'segundo_nombre' => ['nullable', 'string', 'max:100', self::REGEX_NOMBRES],
+            'primer_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
+            'segundo_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8',
             'curso_id' => 'nullable|exists:cursos,id',
@@ -60,7 +63,10 @@ class EstudianteController extends Controller
 
         $estudiante = DB::transaction(function () use ($request) {
             $user = User::create([
-                'name' => $request->name,
+                'primer_nombre' => $request->primer_nombre,
+                'segundo_nombre' => $request->segundo_nombre,
+                'primer_apellido' => $request->primer_apellido,
+                'segundo_apellido' => $request->segundo_apellido,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'role' => 'estudiante',
@@ -69,7 +75,7 @@ class EstudianteController extends Controller
             return Estudiante::create([
                 'user_id' => $user->id,
                 'curso_id' => $request->curso_id,
-                'nombre' => $request->name,
+                'nombre' => $user->name,
                 'cedula' => $request->cedula,
                 'telefono' => $request->telefono,
                 'municipio' => $request->municipio,
@@ -219,6 +225,10 @@ class EstudianteController extends Controller
         $data = $request->validate([
             'curso_id' => 'nullable|exists:cursos,id',
             'nombre' => ['sometimes', 'string', 'max:255', self::REGEX_ALFABETICO],
+            'primer_nombre' => ['sometimes', 'string', 'max:100', self::REGEX_NOMBRES],
+            'segundo_nombre' => ['nullable', 'string', 'max:100', self::REGEX_NOMBRES],
+            'primer_apellido' => ['sometimes', 'string', 'max:100', self::REGEX_NOMBRES],
+            'segundo_apellido' => ['sometimes', 'string', 'max:100', self::REGEX_NOMBRES],
             'cedula' => ['sometimes', 'string', 'max:15', 'unique:estudiantes,cedula,'.$id, self::REGEX_CEDULA],
             'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
@@ -228,7 +238,21 @@ class EstudianteController extends Controller
             'estado' => 'in:activo,inactivo,graduado',
         ], $this->mensajesTipoDato());
 
-        $estudiante->update($data);
+        $estudiante->load('user');
+
+        $camposUsuario = array_intersect_key($data, array_flip([
+            'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido',
+        ]));
+
+        if (! empty($camposUsuario) && $estudiante->user) {
+            $estudiante->user->update($camposUsuario);
+            $estudiante->user->refresh();
+            $data['nombre'] = $estudiante->user->name;
+        }
+
+        $estudiante->update(array_diff_key($data, array_flip([
+            'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido',
+        ])));
 
         return response()->json($estudiante->load('user', 'curso'));
     }
