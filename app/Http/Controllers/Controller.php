@@ -7,8 +7,8 @@ abstract class Controller
     /** Solo dígitos (teléfono, referencia). */
     public const REGEX_NUMERICO = 'regex:/^[0-9]+$/';
 
-    /** Cédula dominicana: 11 dígitos, con o sin guiones (001-1234567-8). */
-    public const REGEX_CEDULA = 'regex:/^\d{3}-?\d{7}-?\d$/';
+    /** Cédula: 7 u 8 dígitos numéricos. */
+    public const REGEX_CEDULA = 'regex:/^\d{7,8}$/';
 
     /** Solo letras (incluye acentos), espacios, apóstrofes, puntos y guiones (nombres y apellidos). */
     public const REGEX_ALFABETICO = 'regex:/^[\pL\pM\s\'\-\.]+$/u';
@@ -29,7 +29,7 @@ abstract class Controller
             'segundo_nombre.regex' => 'El segundo nombre solo puede contener letras y espacios.',
             'primer_apellido.regex' => 'El primer apellido solo puede contener letras y espacios.',
             'segundo_apellido.regex' => 'El segundo apellido solo puede contener letras y espacios.',
-            'cedula.regex' => 'La cédula debe tener 11 dígitos, con o sin guiones (001-1234567-8).',
+            'cedula.regex' => 'La cédula debe tener 7 u 8 dígitos numéricos.',
             'telefono.regex' => 'El teléfono solo puede contener dígitos numéricos.',
         ];
     }

@@ -18,7 +18,7 @@ class EstudianteFactory extends Factory
         return [
             'user_id' => User::factory()->state(['role' => 'estudiante']),
             'nombre' => fake()->name(),
-            'cedula' => fake()->unique()->numerify('001-#######-#'),
+            'cedula' => fake()->unique()->numerify('########'),
             'telefono' => fake()->numerify('809#######'),
             'genero' => 'femenino',
             'fecha_inscripcion' => now()->toDateString(),

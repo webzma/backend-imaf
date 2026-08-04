@@ -43,14 +43,14 @@ class ProfesorTest extends TestCase
             'segundo_apellido' => 'Díaz',
             'email' => 'carlos@example.com',
             'password' => 'password123',
-            'cedula' => '001-4444444-4',
+            'cedula' => '44444444',
             'tipo_contrato_id' => $tipo->id,
         ]);
 
         $response->assertCreated()
             ->assertJsonFragment(['primer_nombre' => 'Carlos', 'segundo_apellido' => 'Díaz']);
         $this->assertDatabaseHas('users', ['email' => 'carlos@example.com', 'role' => 'profesor', 'name' => 'Carlos Alberto Ruiz Díaz']);
-        $this->assertDatabaseHas('profesores', ['cedula' => '001-4444444-4']);
+        $this->assertDatabaseHas('profesores', ['cedula' => '44444444']);
     }
 
     public function test_crear_profesor_requiere_tipo_contrato_valido(): void
@@ -63,7 +63,7 @@ class ProfesorTest extends TestCase
             'segundo_apellido' => 'Contrato',
             'email' => 'sincontrato@example.com',
             'password' => 'password123',
-            'cedula' => '001-5555555-5',
+            'cedula' => '55555555',
             'tipo_contrato_id' => 9999,
         ])->assertStatus(422)->assertJsonValidationErrors('tipo_contrato_id');
     }

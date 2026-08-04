@@ -17,7 +17,7 @@ class ProfesorFactory extends Factory
     {
         return [
             'user_id' => User::factory()->state(['role' => 'profesor']),
-            'cedula' => fake()->unique()->numerify('001-#######-#'),
+            'cedula' => fake()->unique()->numerify('########'),
             'telefono' => fake()->numerify('809#######'),
             'especialidad' => fake()->word(),
             'genero' => 'masculino',
