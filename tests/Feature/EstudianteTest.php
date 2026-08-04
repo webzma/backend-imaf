@@ -45,7 +45,7 @@ class EstudianteTest extends TestCase
             'segundo_apellido' => 'Gómez',
             'email' => 'maria@example.com',
             'password' => 'password123',
-            'cedula' => '001-2222222-2',
+            'cedula' => '22222222',
             'fecha_inscripcion' => '2026-06-01',
             'estado' => 'activo',
         ]);
@@ -59,7 +59,7 @@ class EstudianteTest extends TestCase
             'role' => 'estudiante',
         ]);
         $this->assertDatabaseHas('estudiantes', [
-            'cedula' => '001-2222222-2',
+            'cedula' => '22222222',
             'estado' => 'activo',
         ]);
     }
@@ -67,7 +67,7 @@ class EstudianteTest extends TestCase
     public function test_crear_estudiante_falla_con_cedula_duplicada(): void
     {
         $this->actingAsAdmin();
-        Estudiante::factory()->create(['cedula' => '001-3333333-3']);
+        Estudiante::factory()->create(['cedula' => '33333333']);
 
         $this->postJson('/api/admin/estudiantes', [
             'primer_nombre' => 'Pedro',
@@ -75,7 +75,7 @@ class EstudianteTest extends TestCase
             'segundo_apellido' => 'Apellido',
             'email' => 'pedro@example.com',
             'password' => 'password123',
-            'cedula' => '001-3333333-3',
+            'cedula' => '33333333',
             'fecha_inscripcion' => '2026-06-01',
         ])->assertStatus(422)->assertJsonValidationErrors('cedula');
     }
