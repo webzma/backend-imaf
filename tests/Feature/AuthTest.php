@@ -24,6 +24,7 @@ class AuthTest extends TestCase
             'cedula' => '00123456',
             'telefono' => '8090000000',
             'municipio' => 'Santo Domingo',
+            'direccion' => 'Calle 5, Ensanche La Paz',
             'fecha_nacimiento' => '2000-01-15',
             'genero' => 'masculino',
         ]);
@@ -31,7 +32,8 @@ class AuthTest extends TestCase
         $response->assertCreated()
             ->assertJsonStructure(['user' => ['id', 'name', 'email', 'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido'], 'token'])
             ->assertJsonFragment(['name' => 'Juan Pablo Pérez Gómez'])
-            ->assertJsonFragment(['primer_nombre' => 'Juan', 'segundo_apellido' => 'Gómez']);
+            ->assertJsonFragment(['primer_nombre' => 'Juan', 'segundo_apellido' => 'Gómez'])
+            ->assertJsonFragment(['municipio' => 'Santo Domingo', 'direccion' => 'Calle 5, Ensanche La Paz']);
 
         $this->assertDatabaseHas('users', [
             'email' => 'juan@example.com',
@@ -39,6 +41,8 @@ class AuthTest extends TestCase
         ]);
         $this->assertDatabaseHas('estudiantes', [
             'cedula' => '00123456',
+            'municipio' => 'Santo Domingo',
+            'direccion' => 'Calle 5, Ensanche La Paz',
             'estado' => 'activo',
         ]);
     }
@@ -54,6 +58,7 @@ class AuthTest extends TestCase
             'password_confirmation' => 'password123',
             'cedula' => '1234567',
             'telefono' => '8090000000',
+            'direccion' => 'Avenida Duarte #45',
             'fecha_nacimiento' => '2000-01-15',
             'genero' => 'masculino',
         ]);
@@ -72,6 +77,7 @@ class AuthTest extends TestCase
             'password_confirmation' => 'password123',
             'cedula' => '001-1234567-8',
             'telefono' => '8090000000',
+            'direccion' => 'Calle 10, Los Prados',
             'fecha_nacimiento' => '2000-01-15',
             'genero' => 'masculino',
         ]);
@@ -94,6 +100,7 @@ class AuthTest extends TestCase
             'password_confirmation' => 'password123',
             'cedula' => '99999999',
             'telefono' => '8091111111',
+            'direccion' => 'Calle 20, Bella Vista',
             'fecha_nacimiento' => '1999-05-05',
             'genero' => 'femenino',
         ]);
