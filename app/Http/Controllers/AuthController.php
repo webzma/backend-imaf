@@ -23,6 +23,7 @@ class AuthController extends Controller
             'cedula' => ['required', 'string', 'max:15', 'unique:estudiantes,cedula', self::REGEX_CEDULA],
             'telefono' => ['required', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
+            'direccion' => ['required', 'string', 'max:255', self::REGEX_DIRECCION],
             'fecha_nacimiento' => 'required|date',
             'genero' => 'required|in:masculino,femenino,otro',
         ], $this->mensajesTipoDato());
@@ -44,6 +45,7 @@ class AuthController extends Controller
                 'cedula' => $request->cedula,
                 'telefono' => $request->telefono,
                 'municipio' => $request->municipio,
+                'direccion' => $request->direccion,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
                 'genero' => $request->genero,
                 'fecha_inscripcion' => now()->toDateString(),
