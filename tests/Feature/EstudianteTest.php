@@ -46,13 +46,16 @@ class EstudianteTest extends TestCase
             'email' => 'maria@example.com',
             'password' => 'password123',
             'cedula' => '22222222',
+            'municipio' => 'Santiago',
+            'direccion' => 'Calle Las Carreras #12',
             'fecha_inscripcion' => '2026-06-01',
             'estado' => 'activo',
         ]);
 
         $response->assertCreated()
             ->assertJsonFragment(['nombre' => 'María Elena López Gómez'])
-            ->assertJsonFragment(['primer_nombre' => 'María', 'segundo_apellido' => 'Gómez']);
+            ->assertJsonFragment(['primer_nombre' => 'María', 'segundo_apellido' => 'Gómez'])
+            ->assertJsonFragment(['municipio' => 'Santiago', 'direccion' => 'Calle Las Carreras #12']);
 
         $this->assertDatabaseHas('users', [
             'email' => 'maria@example.com',
@@ -60,6 +63,8 @@ class EstudianteTest extends TestCase
         ]);
         $this->assertDatabaseHas('estudiantes', [
             'cedula' => '22222222',
+            'municipio' => 'Santiago',
+            'direccion' => 'Calle Las Carreras #12',
             'estado' => 'activo',
         ]);
     }
@@ -76,8 +81,43 @@ class EstudianteTest extends TestCase
             'email' => 'pedro@example.com',
             'password' => 'password123',
             'cedula' => '33333333',
+            'municipio' => 'La Vega',
+            'direccion' => 'Calle 14, Concepción',
             'fecha_inscripcion' => '2026-06-01',
         ])->assertStatus(422)->assertJsonValidationErrors('cedula');
+    }
+
+    public function test_listar_estudiantes_devuelve_municipio_y_direccion(): void
+    {
+        $this->actingAsAdmin();
+        Estudiante::factory()->create([
+            'municipio' => 'Santiago',
+            'direccion' => 'Calle 5, Centro',
+        ]);
+
+        $this->getJson('/api/admin/estudiantes')
+            ->assertOk()
+            ->assertJsonFragment(['municipio' => 'Santiago', 'direccion' => 'Calle 5, Centro']);
+    }
+
+    public function test_admin_puede_actualizar_municipio_y_direccion(): void
+    {
+        $this->actingAsAdmin();
+        $estudiante = Estudiante::factory()->create();
+
+        $response = $this->putJson("/api/admin/estudiantes/{$estudiante->id}", [
+            'municipio' => 'Santiago',
+            'direccion' => 'Calle Las Carreras #12',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonFragment(['municipio' => 'Santiago', 'direccion' => 'Calle Las Carreras #12']);
+
+        $this->assertDatabaseHas('estudiantes', [
+            'id' => $estudiante->id,
+            'municipio' => 'Santiago',
+            'direccion' => 'Calle Las Carreras #12',
+        ]);
     }
 
     public function test_filtro_por_estado_devuelve_solo_coincidencias(): void
