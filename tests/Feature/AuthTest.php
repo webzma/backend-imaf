@@ -14,11 +14,14 @@ class AuthTest extends TestCase
     public function test_register_crea_usuario_estudiante_y_devuelve_token(): void
     {
         $response = $this->postJson('/api/register', [
-            'name' => 'Juan Pérez',
+            'primer_nombre' => 'Juan',
+            'segundo_nombre' => 'Pablo',
+            'primer_apellido' => 'Pérez',
+            'segundo_apellido' => 'Gómez',
             'email' => 'juan@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'cedula' => '001-1234567-8',
+            'cedula' => '00123456',
             'telefono' => '8090000000',
             'municipio' => 'Santo Domingo',
             'fecha_nacimiento' => '2000-01-15',
@@ -26,16 +29,56 @@ class AuthTest extends TestCase
         ]);
 
         $response->assertCreated()
-            ->assertJsonStructure(['user' => ['id', 'name', 'email'], 'token']);
+            ->assertJsonStructure(['user' => ['id', 'name', 'email', 'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido'], 'token'])
+            ->assertJsonFragment(['name' => 'Juan Pablo Pérez Gómez'])
+            ->assertJsonFragment(['primer_nombre' => 'Juan', 'segundo_apellido' => 'Gómez']);
 
         $this->assertDatabaseHas('users', [
             'email' => 'juan@example.com',
             'role' => 'estudiante',
         ]);
         $this->assertDatabaseHas('estudiantes', [
-            'cedula' => '001-1234567-8',
+            'cedula' => '00123456',
             'estado' => 'activo',
         ]);
+    }
+
+    public function test_register_acepta_cedula_de_7_u_8_digitos(): void
+    {
+        $response = $this->postJson('/api/register', [
+            'primer_nombre' => 'Juan',
+            'primer_apellido' => 'Pérez',
+            'segundo_apellido' => 'Gómez',
+            'email' => 'juan7@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'cedula' => '1234567',
+            'telefono' => '8090000000',
+            'fecha_nacimiento' => '2000-01-15',
+            'genero' => 'masculino',
+        ]);
+
+        $response->assertCreated();
+    }
+
+    public function test_register_rechaza_cedula_con_mas_de_8_digitos(): void
+    {
+        $response = $this->postJson('/api/register', [
+            'primer_nombre' => 'Juan',
+            'primer_apellido' => 'Pérez',
+            'segundo_apellido' => 'Gómez',
+            'email' => 'juan11@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'cedula' => '001-1234567-8',
+            'telefono' => '8090000000',
+            'fecha_nacimiento' => '2000-01-15',
+            'genero' => 'masculino',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors('cedula')
+            ->assertJsonFragment(['La cédula debe tener 7 u 8 dígitos numéricos.']);
     }
 
     public function test_register_falla_con_email_duplicado(): void
@@ -43,11 +86,13 @@ class AuthTest extends TestCase
         User::factory()->create(['email' => 'dup@example.com']);
 
         $response = $this->postJson('/api/register', [
-            'name' => 'Otro',
+            'primer_nombre' => 'Otro',
+            'primer_apellido' => 'Apellido',
+            'segundo_apellido' => 'Apellido',
             'email' => 'dup@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'cedula' => '001-9999999-9',
+            'cedula' => '99999999',
             'telefono' => '8091111111',
             'fecha_nacimiento' => '1999-05-05',
             'genero' => 'femenino',

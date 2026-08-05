@@ -39,23 +39,27 @@ class EstudianteTest extends TestCase
         $this->actingAsAdmin();
 
         $response = $this->postJson('/api/admin/estudiantes', [
-            'name' => 'María López',
+            'primer_nombre' => 'María',
+            'segundo_nombre' => 'Elena',
+            'primer_apellido' => 'López',
+            'segundo_apellido' => 'Gómez',
             'email' => 'maria@example.com',
             'password' => 'password123',
-            'cedula' => '001-2222222-2',
+            'cedula' => '22222222',
             'fecha_inscripcion' => '2026-06-01',
             'estado' => 'activo',
         ]);
 
         $response->assertCreated()
-            ->assertJsonFragment(['nombre' => 'María López']);
+            ->assertJsonFragment(['nombre' => 'María Elena López Gómez'])
+            ->assertJsonFragment(['primer_nombre' => 'María', 'segundo_apellido' => 'Gómez']);
 
         $this->assertDatabaseHas('users', [
             'email' => 'maria@example.com',
             'role' => 'estudiante',
         ]);
         $this->assertDatabaseHas('estudiantes', [
-            'cedula' => '001-2222222-2',
+            'cedula' => '22222222',
             'estado' => 'activo',
         ]);
     }
@@ -63,13 +67,15 @@ class EstudianteTest extends TestCase
     public function test_crear_estudiante_falla_con_cedula_duplicada(): void
     {
         $this->actingAsAdmin();
-        Estudiante::factory()->create(['cedula' => '001-3333333-3']);
+        Estudiante::factory()->create(['cedula' => '33333333']);
 
         $this->postJson('/api/admin/estudiantes', [
-            'name' => 'Pedro',
+            'primer_nombre' => 'Pedro',
+            'primer_apellido' => 'Apellido',
+            'segundo_apellido' => 'Apellido',
             'email' => 'pedro@example.com',
             'password' => 'password123',
-            'cedula' => '001-3333333-3',
+            'cedula' => '33333333',
             'fecha_inscripcion' => '2026-06-01',
         ])->assertStatus(422)->assertJsonValidationErrors('cedula');
     }
