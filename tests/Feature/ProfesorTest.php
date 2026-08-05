@@ -37,16 +37,20 @@ class ProfesorTest extends TestCase
         $tipo = TipoContrato::create(['nombre' => 'Tiempo completo']);
 
         $response = $this->postJson('/api/admin/profesores', [
-            'name' => 'Carlos Ruiz',
+            'primer_nombre' => 'Carlos',
+            'segundo_nombre' => 'Alberto',
+            'primer_apellido' => 'Ruiz',
+            'segundo_apellido' => 'Díaz',
             'email' => 'carlos@example.com',
             'password' => 'password123',
-            'cedula' => '001-4444444-4',
+            'cedula' => '44444444',
             'tipo_contrato_id' => $tipo->id,
         ]);
 
-        $response->assertCreated();
-        $this->assertDatabaseHas('users', ['email' => 'carlos@example.com', 'role' => 'profesor']);
-        $this->assertDatabaseHas('profesores', ['cedula' => '001-4444444-4']);
+        $response->assertCreated()
+            ->assertJsonFragment(['primer_nombre' => 'Carlos', 'segundo_apellido' => 'Díaz']);
+        $this->assertDatabaseHas('users', ['email' => 'carlos@example.com', 'role' => 'profesor', 'name' => 'Carlos Alberto Ruiz Díaz']);
+        $this->assertDatabaseHas('profesores', ['cedula' => '44444444']);
     }
 
     public function test_crear_profesor_requiere_tipo_contrato_valido(): void
@@ -54,10 +58,12 @@ class ProfesorTest extends TestCase
         $this->actingAsAdmin();
 
         $this->postJson('/api/admin/profesores', [
-            'name' => 'Sin contrato',
+            'primer_nombre' => 'Sin',
+            'primer_apellido' => 'Contrato',
+            'segundo_apellido' => 'Contrato',
             'email' => 'sincontrato@example.com',
             'password' => 'password123',
-            'cedula' => '001-5555555-5',
+            'cedula' => '55555555',
             'tipo_contrato_id' => 9999,
         ])->assertStatus(422)->assertJsonValidationErrors('tipo_contrato_id');
     }
