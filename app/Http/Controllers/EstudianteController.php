@@ -39,7 +39,7 @@ class EstudianteController extends Controller
             $query->where('estado_pago', $request->estado_pago);
         }
 
-        return response()->json($query->paginate(20));
+        return response()->json($query->paginate($this->registrosPorPagina($request)));
     }
 
     public function store(Request $request)

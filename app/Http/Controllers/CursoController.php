@@ -12,11 +12,14 @@ use Illuminate\Validation\Rule;
 
 class CursoController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         CursoEstadoService::sincronizarConCache();
 
-        return response()->json(Curso::with('instructor.user', 'estudiantes.user')->get());
+        return response()->json(
+            Curso::with('instructor.user', 'estudiantes.user')
+                ->paginate($this->registrosPorPagina($request))
+        );
     }
 
     public function indexActivos()

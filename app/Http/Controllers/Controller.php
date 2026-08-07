@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
+
 abstract class Controller
 {
     /** Solo dígitos (teléfono, referencia). */
@@ -18,6 +20,20 @@ abstract class Controller
 
     /** Dirección: cualquier carácter excepto comillas, backticks, punto y coma y backslash. */
     public const REGEX_DIRECCION = 'regex:/^[^\'"`;\\\\]+$/u';
+
+    /** Tope máximo de registros por página. */
+    public const MAX_PER_PAGE = 1000;
+
+    /**
+     * Lee y acota el parámetro `per_page` para la paginación
+     * (entero positivo, default 10, tope MAX_PER_PAGE).
+     */
+    protected function registrosPorPagina(Request $request): int
+    {
+        $perPage = $request->integer('per_page', 10);
+
+        return max(1, min($perPage, self::MAX_PER_PAGE));
+    }
 
     /**
      * Mensajes en español para las reglas de tipo de dato
