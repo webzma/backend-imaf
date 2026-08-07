@@ -87,6 +87,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Solo profesor
     Route::middleware('role:profesor')->prefix('profesor')->group(function () {
+        Route::get('cursos', [CursoController::class, 'misCursos']);
         Route::put('perfil/{id}', [ProfesorController::class, 'update']);
         Route::post('perfil/foto', [ProfesorController::class, 'uploadFotoMe']);
 
