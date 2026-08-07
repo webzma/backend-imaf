@@ -24,15 +24,26 @@ abstract class Controller
     /** Tope máximo de registros por página. */
     public const MAX_PER_PAGE = 1000;
 
-    /**
-     * Lee y acota el parámetro `per_page` para la paginación
-     * (entero positivo, default 10, tope MAX_PER_PAGE).
-     */
-    protected function registrosPorPagina(Request $request): int
-    {
-        $perPage = $request->integer('per_page', 10);
+    /** Tope máximo de registros por página en los catálogos (estudiante y profesor). */
+    public const MAX_PER_PAGE_CATALOGO = 100;
 
-        return max(1, min($perPage, self::MAX_PER_PAGE));
+    /** Registros por página por defecto. */
+    public const DEFAULT_PER_PAGE = 10;
+
+    /**
+     * Lee y acota el parámetro `per_page` para la paginación.
+     * Un valor inválido (0, negativo o no numérico) cae al default.
+     */
+    protected function registrosPorPagina(Request $request, ?int $maxPerPage = null): int
+    {
+        $maxPerPage = $maxPerPage ?? self::MAX_PER_PAGE;
+        $perPage = $request->integer('per_page', self::DEFAULT_PER_PAGE);
+
+        if ($perPage < 1) {
+            return self::DEFAULT_PER_PAGE;
+        }
+
+        return min($perPage, $maxPerPage);
     }
 
     /**
