@@ -29,7 +29,8 @@ class CursoTest extends TestCase
 
         $this->getJson('/api/admin/cursos')
             ->assertOk()
-            ->assertJsonCount(3);
+            ->assertJsonCount(3, 'data')
+            ->assertJsonStructure(['data', 'current_page', 'last_page', 'per_page', 'total']);
     }
 
     public function test_admin_puede_crear_un_curso(): void
