@@ -28,7 +28,8 @@ class ProfesorTest extends TestCase
 
         $this->getJson('/api/admin/profesores')
             ->assertOk()
-            ->assertJsonCount(2);
+            ->assertJsonCount(2, 'data')
+            ->assertJsonStructure(['data', 'current_page', 'last_page', 'per_page', 'total']);
     }
 
     public function test_admin_puede_crear_profesor_con_usuario(): void

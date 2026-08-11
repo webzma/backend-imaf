@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\CursoResumenResource;
 use App\Models\Curso;
 use App\Models\Profesor;
 use App\Notifications\GenericNotification;
@@ -12,22 +13,43 @@ use Illuminate\Validation\Rule;
 
 class CursoController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         CursoEstadoService::sincronizarConCache();
 
-        return response()->json(Curso::with('instructor.user', 'estudiantes.user')->get());
+        return response()->json(
+            Curso::with('instructor.user', 'estudiantes.user')
+                ->paginate($this->registrosPorPagina($request))
+        );
     }
 
-    public function indexActivos()
+    public function indexActivos(Request $request)
     {
         CursoEstadoService::sincronizarConCache();
 
         return response()->json(
             Curso::with('instructor.user', 'estudiantes.user')
                 ->where('estado', 'activo')
-                ->get()
+                ->latest('id')
+                ->paginate($this->registrosPorPagina($request, self::MAX_PER_PAGE_CATALOGO))
         );
+    }
+
+    public function misCursos(Request $request)
+    {
+        $profesor = Profesor::where('user_id', $request->user()->id)->firstOrFail();
+
+        $cursos = Curso::where('profesor_id', $profesor->id)
+            ->latest('id')
+            ->paginate($this->registrosPorPagina($request, self::MAX_PER_PAGE_CATALOGO));
+
+        return response()->json([
+            'data' => CursoResumenResource::collection($cursos),
+            'total' => $cursos->total(),
+            'current_page' => $cursos->currentPage(),
+            'last_page' => $cursos->lastPage(),
+            'per_page' => $cursos->perPage(),
+        ]);
     }
 
     public function store(Request $request)

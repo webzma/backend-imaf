@@ -13,9 +13,11 @@ use Illuminate\Support\Facades\Hash;
 
 class ProfesorController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(Profesor::with('user', 'tipoContrato')->get());
+        return response()->json(
+            Profesor::with('user', 'tipoContrato')->paginate($this->registrosPorPagina($request))
+        );
     }
 
     public function getTipoContratos()
