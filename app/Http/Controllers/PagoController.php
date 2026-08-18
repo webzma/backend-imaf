@@ -254,6 +254,7 @@ class PagoController extends Controller
                 'id' => $estudiante->id,
                 'nombre' => $estudiante->nombre,
                 'cedula' => $estudiante->cedula,
+                'foto' => $estudiante->foto,
                 'user' => $user ? [
                     'name' => $user->name,
                     'email' => $user->email,
