@@ -22,7 +22,7 @@ class AsistenciaController extends Controller
         }
 
         $estudiantes = Estudiante::where('curso_id', $sesion->curso_id)
-            ->select('id', 'nombre', 'cedula')
+            ->select('id', 'nombre', 'cedula', 'foto')
             ->get();
 
         $asistencias = Asistencia::where('sesion_id', $sesionId)
@@ -36,6 +36,7 @@ class AsistenciaController extends Controller
                 'estudiante_id' => $estudiante->id,
                 'nombre' => $estudiante->nombre,
                 'cedula' => $estudiante->cedula,
+                'foto' => $estudiante->foto,
                 'presente' => $registro?->presente ?? false,
                 'observacion' => $registro?->observacion,
             ];

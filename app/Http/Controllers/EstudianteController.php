@@ -132,6 +132,7 @@ class EstudianteController extends Controller
                 'instructor' => $profesor ? [
                     'id' => $profesor->id,
                     'nombre' => $profesor->user?->name,
+                    'foto' => $profesor->foto,
                     'especialidad' => $profesor->especialidad,
                     'titulo' => $profesor->titulo,
                     'departamento' => $profesor->departamento,
