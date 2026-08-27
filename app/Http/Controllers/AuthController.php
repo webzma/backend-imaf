@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Estudiante;
 use App\Models\User;
+use App\Notifications\ResetPasswordNotification;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -117,7 +118,7 @@ class AuthController extends Controller
      *
      * Si el correo existe, se genera un token y se envía un email.
      * La respuesta es la misma sin importar si el correo existe o no,
-     * para evitarEnumeración de usuarios.
+     * para evitar la enumeración de usuarios.
      */
     public function forgotPassword(Request $request)
     {
@@ -138,7 +139,7 @@ class AuthController extends Controller
                 ],
             );
 
-            $user->notify(new \App\Notifications\ResetPasswordNotification($token));
+            $user->notify(new ResetPasswordNotification($token));
         }
 
         return response()->json([
