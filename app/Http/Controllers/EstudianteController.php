@@ -52,6 +52,7 @@ class EstudianteController extends Controller
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8',
             'curso_id' => 'nullable|exists:cursos,id',
+            'nacionalidad' => 'required|in:V,E',
             'cedula' => ['required', 'string', 'max:15', 'unique:estudiantes,cedula', self::REGEX_CEDULA],
             'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => ['required', 'string', 'max:255'],
@@ -77,6 +78,7 @@ class EstudianteController extends Controller
                 'user_id' => $user->id,
                 'curso_id' => $request->curso_id,
                 'nombre' => $user->name,
+                'nacionalidad' => $request->nacionalidad,
                 'cedula' => $request->cedula,
                 'telefono' => $request->telefono,
                 'municipio' => $request->municipio,
@@ -164,6 +166,7 @@ class EstudianteController extends Controller
         $id = $estudiante->id;
 
         $data = $request->validate([
+            'nacionalidad' => ['sometimes', 'in:V,E'],
             'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
             'fecha_nacimiento' => 'nullable|date',
@@ -232,6 +235,7 @@ class EstudianteController extends Controller
             'segundo_nombre' => ['nullable', 'string', 'max:100', self::REGEX_NOMBRES],
             'primer_apellido' => ['sometimes', 'string', 'max:100', self::REGEX_NOMBRES],
             'segundo_apellido' => ['sometimes', 'string', 'max:100', self::REGEX_NOMBRES],
+            'nacionalidad' => ['sometimes', 'in:V,E'],
             'cedula' => ['sometimes', 'string', 'max:15', 'unique:estudiantes,cedula,'.$id, self::REGEX_CEDULA],
             'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => ['required', 'string', 'max:255'],

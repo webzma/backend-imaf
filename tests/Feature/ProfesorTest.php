@@ -44,6 +44,7 @@ class ProfesorTest extends TestCase
             'segundo_apellido' => 'Díaz',
             'email' => 'carlos@example.com',
             'password' => 'password123',
+            'nacionalidad' => 'V',
             'cedula' => '44444444',
             'tipo_contrato_id' => $tipo->id,
         ]);
@@ -64,6 +65,7 @@ class ProfesorTest extends TestCase
             'segundo_apellido' => 'Contrato',
             'email' => 'sincontrato@example.com',
             'password' => 'password123',
+            'nacionalidad' => 'V',
             'cedula' => '55555555',
             'tipo_contrato_id' => 9999,
         ])->assertStatus(422)->assertJsonValidationErrors('tipo_contrato_id');
