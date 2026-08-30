@@ -14,6 +14,7 @@ class Profesor extends Model
 
     protected $fillable = [
         'user_id',
+        'nacionalidad',
         'cedula',
         'telefono',
         'municipio',
