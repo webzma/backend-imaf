@@ -34,6 +34,7 @@ class ProfesorController extends Controller
             'segundo_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8',
+            'nacionalidad' => 'required|in:V,E',
             'cedula' => ['required', 'string', 'max:15', 'unique:profesores,cedula', self::REGEX_CEDULA],
             'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
@@ -58,6 +59,7 @@ class ProfesorController extends Controller
 
             return Profesor::create([
                 'user_id' => $user->id,
+                'nacionalidad' => $request->nacionalidad,
                 'cedula' => $request->cedula,
                 'telefono' => $request->telefono,
                 'municipio' => $request->municipio,
@@ -93,6 +95,7 @@ class ProfesorController extends Controller
         }
 
         $rules = [
+            'nacionalidad' => ['sometimes', 'in:V,E'],
             'cedula' => ['sometimes', 'string', 'max:15', 'unique:profesores,cedula,'.$id, self::REGEX_CEDULA],
             'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',

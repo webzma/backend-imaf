@@ -14,6 +14,7 @@ class Estudiante extends Model
         'user_id',
         'curso_id',
         'nombre',
+        'nacionalidad',
         'cedula',
         'telefono',
         'municipio',

@@ -23,6 +23,7 @@ class AuthController extends Controller
             'segundo_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8|confirmed',
+            'nacionalidad' => 'required|in:V,E',
             'cedula' => ['required', 'string', 'max:15', 'unique:estudiantes,cedula', self::REGEX_CEDULA],
             'telefono' => ['required', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
@@ -45,6 +46,7 @@ class AuthController extends Controller
             Estudiante::create([
                 'user_id' => $user->id,
                 'nombre' => $user->name,
+                'nacionalidad' => $request->nacionalidad,
                 'cedula' => $request->cedula,
                 'telefono' => $request->telefono,
                 'municipio' => $request->municipio,
