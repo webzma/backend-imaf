@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Departamento;
+use App\Models\Especialidad;
 use App\Models\Profesor;
 use App\Models\TipoContrato;
-use App\Models\Especialidad;
-use App\Models\Departamento;
 use App\Models\Titulo;
 use App\Models\User;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
