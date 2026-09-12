@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Profesor;
 use App\Models\TipoContrato;
+use App\Models\Especialidad;
+use App\Models\Departamento;
+use App\Models\Titulo;
 use App\Models\User;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Http\Request;
@@ -16,13 +19,29 @@ class ProfesorController extends Controller
     public function index(Request $request)
     {
         return response()->json(
-            Profesor::with('user', 'tipoContrato')->paginate($this->registrosPorPagina($request))
+            Profesor::with('user', 'tipoContrato', 'especialidad', 'departamento', 'titulo')
+                ->paginate($this->registrosPorPagina($request))
         );
     }
 
     public function getTipoContratos()
     {
         return response()->json(TipoContrato::all());
+    }
+
+    public function getEspecialidades()
+    {
+        return response()->json(Especialidad::orderBy('nombre')->get());
+    }
+
+    public function getDepartamentos()
+    {
+        return response()->json(Departamento::orderBy('nombre')->get());
+    }
+
+    public function getTitulos()
+    {
+        return response()->json(Titulo::orderBy('nombre')->get());
     }
 
     public function store(Request $request)
@@ -38,9 +57,9 @@ class ProfesorController extends Controller
             'cedula' => ['required', 'string', 'max:15', 'unique:profesores,cedula', self::REGEX_CEDULA],
             'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
-            'especialidad' => 'nullable|string|max:255',
-            'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
-            'departamento' => 'nullable|string|max:255',
+            'especialidad_id' => 'required|exists:especialidades,id',
+            'titulo_id' => 'required|exists:titulos,id',
+            'departamento_id' => 'required|exists:departamentos,id',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
             'tipo_contrato_id' => 'required|exists:tipo_contratos,id',
@@ -63,21 +82,21 @@ class ProfesorController extends Controller
                 'cedula' => $request->cedula,
                 'telefono' => $request->telefono,
                 'municipio' => $request->municipio,
-                'especialidad' => $request->especialidad,
-                'titulo' => $request->titulo,
-                'departamento' => $request->departamento,
+                'especialidad_id' => $request->especialidad_id,
+                'titulo_id' => $request->titulo_id,
+                'departamento_id' => $request->departamento_id,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
                 'genero' => $request->genero,
                 'tipo_contrato_id' => $request->tipo_contrato_id,
             ]);
         });
 
-        return response()->json($profesor->load('user', 'tipoContrato'), 201);
+        return response()->json($profesor->load('user', 'tipoContrato', 'especialidad', 'departamento', 'titulo'), 201);
     }
 
     public function show(string $id)
     {
-        $profesor = Profesor::with('user', 'cursos', 'tipoContrato')->findOrFail($id);
+        $profesor = Profesor::with('user', 'cursos', 'tipoContrato', 'especialidad', 'departamento', 'titulo')->findOrFail($id);
 
         return response()->json($profesor);
     }
@@ -99,9 +118,9 @@ class ProfesorController extends Controller
             'cedula' => ['sometimes', 'string', 'max:15', 'unique:profesores,cedula,'.$id, self::REGEX_CEDULA],
             'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
             'municipio' => 'nullable|string|max:255',
-            'especialidad' => 'nullable|string|max:255',
-            'titulo' => 'nullable|in:licenciatura,maestria,doctorado',
-            'departamento' => 'nullable|string|max:255',
+            'especialidad_id' => 'nullable|exists:especialidades,id',
+            'titulo_id' => 'nullable|exists:titulos,id',
+            'departamento_id' => 'nullable|exists:departamentos,id',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
             'tipo_contrato_id' => 'sometimes|exists:tipo_contratos,id',
@@ -130,7 +149,7 @@ class ProfesorController extends Controller
             'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email',
         ])));
 
-        return response()->json($profesor->load('user', 'tipoContrato'));
+        return response()->json($profesor->load('user', 'tipoContrato', 'especialidad', 'departamento', 'titulo'));
     }
 
     public function uploadFotoMe(Request $request)
@@ -168,7 +187,7 @@ class ProfesorController extends Controller
         $profesor->update(['foto' => $upload['secure_url']]);
         $profesor->refresh();
 
-        return response()->json($profesor->load('user', 'tipoContrato'));
+        return response()->json($profesor->load('user', 'tipoContrato', 'especialidad', 'departamento', 'titulo'));
     }
 
     public function destroy(string $id)
