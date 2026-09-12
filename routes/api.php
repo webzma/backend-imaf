@@ -40,6 +40,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::apiResource('profesores', ProfesorController::class);
         Route::get('tipo-contratos', [ProfesorController::class, 'getTipoContratos']);
+        Route::get('especialidades', [ProfesorController::class, 'getEspecialidades']);
+        Route::get('departamentos', [ProfesorController::class, 'getDepartamentos']);
+        Route::get('titulos', [ProfesorController::class, 'getTitulos']);
+
+        // Catálogos CRUD (especialidades, departamentos, titulos, tipo-contratos)
+        Route::get('{slug}', [\App\Http\Controllers\CatalogoController::class, 'index']);
+        Route::post('{slug}', [\App\Http\Controllers\CatalogoController::class, 'store']);
+        Route::put('{slug}/{id}', [\App\Http\Controllers\CatalogoController::class, 'update']);
+        Route::delete('{slug}/{id}', [\App\Http\Controllers\CatalogoController::class, 'destroy']);
         Route::apiResource('cursos', CursoController::class);
 
         // Temario y sesiones de cursos

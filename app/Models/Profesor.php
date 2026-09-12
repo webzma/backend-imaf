@@ -18,9 +18,9 @@ class Profesor extends Model
         'cedula',
         'telefono',
         'municipio',
-        'especialidad',
-        'titulo',
-        'departamento',
+        'especialidad_id',
+        'titulo_id',
+        'departamento_id',
         'fecha_nacimiento',
         'genero',
         'foto',
@@ -42,6 +42,21 @@ class Profesor extends Model
     public function tipoContrato()
     {
         return $this->belongsTo(TipoContrato::class, 'tipo_contrato_id');
+    }
+
+    public function especialidad()
+    {
+        return $this->belongsTo(Especialidad::class, 'especialidad_id');
+    }
+
+    public function departamento()
+    {
+        return $this->belongsTo(Departamento::class, 'departamento_id');
+    }
+
+    public function titulo()
+    {
+        return $this->belongsTo(Titulo::class, 'titulo_id');
     }
 
     public function cursos()
