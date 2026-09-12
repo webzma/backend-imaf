@@ -45,11 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('departamentos', [ProfesorController::class, 'getDepartamentos']);
         Route::get('titulos', [ProfesorController::class, 'getTitulos']);
 
-        // Catálogos CRUD (especialidades, departamentos, titulos, tipo-contratos)
-        Route::get('{slug}', [CatalogoController::class, 'index']);
-        Route::post('{slug}', [CatalogoController::class, 'store']);
-        Route::put('{slug}/{id}', [CatalogoController::class, 'update']);
-        Route::delete('{slug}/{id}', [CatalogoController::class, 'destroy']);
+        // Cursos (antes de las rutas genéricas {slug} para evitar conflicto)
         Route::apiResource('cursos', CursoController::class);
 
         // Temario y sesiones de cursos
@@ -83,6 +79,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Reportes
         Route::get('reportes', [ReporteController::class, 'index']);
+
+        // Catálogos CRUD (DEBE ser la última ruta del grupo admin, después de todas las rutas explícitas)
+        Route::get('{slug}', [CatalogoController::class, 'index']);
+        Route::post('{slug}', [CatalogoController::class, 'store']);
+        Route::put('{slug}/{id}', [CatalogoController::class, 'update']);
+        Route::delete('{slug}/{id}', [CatalogoController::class, 'destroy']);
     });
 
     // Profesor y admin

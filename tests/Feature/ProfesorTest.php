@@ -2,8 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\Departamento;
+use App\Models\Especialidad;
 use App\Models\Profesor;
 use App\Models\TipoContrato;
+use App\Models\Titulo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -36,6 +39,9 @@ class ProfesorTest extends TestCase
     {
         $this->actingAsAdmin();
         $tipo = TipoContrato::create(['nombre' => 'Tiempo completo']);
+        $especialidad = Especialidad::create(['nombre' => 'Matemáticas']);
+        $titulo = Titulo::create(['nombre' => 'Licenciatura']);
+        $departamento = Departamento::create(['nombre' => 'Ciencias Exactas']);
 
         $response = $this->postJson('/api/admin/profesores', [
             'primer_nombre' => 'Carlos',
@@ -47,6 +53,9 @@ class ProfesorTest extends TestCase
             'nacionalidad' => 'V',
             'cedula' => '44444444',
             'tipo_contrato_id' => $tipo->id,
+            'especialidad_id' => $especialidad->id,
+            'titulo_id' => $titulo->id,
+            'departamento_id' => $departamento->id,
         ]);
 
         $response->assertCreated()
@@ -73,17 +82,18 @@ class ProfesorTest extends TestCase
 
     public function test_profesor_puede_actualizar_su_propio_perfil(): void
     {
+        $especialidad = Especialidad::create(['nombre' => 'Física']);
         $profesor = Profesor::factory()->create();
         Sanctum::actingAs($profesor->user);
 
         $this->putJson("/api/profesor/perfil/{$profesor->id}", [
             'telefono' => '8095550000',
-            'especialidad' => 'Matemáticas',
-        ])->assertOk()->assertJsonFragment(['especialidad' => 'Matemáticas']);
+            'especialidad_id' => $especialidad->id,
+        ])->assertOk();
 
         $this->assertDatabaseHas('profesores', [
             'id' => $profesor->id,
-            'especialidad' => 'Matemáticas',
+            'especialidad_id' => $especialidad->id,
         ]);
     }
 
@@ -94,7 +104,7 @@ class ProfesorTest extends TestCase
         Sanctum::actingAs($profesor->user);
 
         $this->putJson("/api/profesor/perfil/{$otro->id}", [
-            'especialidad' => 'Hacking',
+            'telefono' => '8090000000',
         ])->assertStatus(403);
     }
 
