@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Departamento;
+use App\Models\Especialidad;
+use App\Models\TipoContrato;
+use App\Models\Titulo;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 
 class CatalogoController extends Controller
 {
@@ -13,10 +16,10 @@ class CatalogoController extends Controller
      * Mapa de slug → modelo Eloquent.
      */
     private const MODELS = [
-        'especialidades'  => \App\Models\Especialidad::class,
-        'departamentos'   => \App\Models\Departamento::class,
-        'titulos'         => \App\Models\Titulo::class,
-        'tipo-contratos'  => \App\Models\TipoContrato::class,
+        'especialidades' => Especialidad::class,
+        'departamentos' => Departamento::class,
+        'titulos' => Titulo::class,
+        'tipo-contratos' => TipoContrato::class,
     ];
 
     /**
@@ -30,7 +33,7 @@ class CatalogoController extends Controller
             abort(404);
         }
 
-        return new $class;
+        return new $class();
     }
 
     /**
@@ -54,8 +57,8 @@ class CatalogoController extends Controller
             'nombre' => ['required', 'string', 'max:255', 'unique:'.$modelo->getTable().',nombre', self::REGEX_ALFABETICO],
         ], [
             'nombre.required' => 'El nombre es obligatorio.',
-            'nombre.unique'   => 'Ya existe un registro con ese nombre.',
-            'nombre.regex'    => 'El nombre solo puede contener letras, espacios y guiones.',
+            'nombre.unique' => 'Ya existe un registro con ese nombre.',
+            'nombre.regex' => 'El nombre solo puede contener letras, espacios y guiones.',
         ]);
 
         $registro = $modelo->create($data);
@@ -75,8 +78,8 @@ class CatalogoController extends Controller
             'nombre' => ['required', 'string', 'max:255', 'unique:'.$modelo->getTable().',nombre,'.$id, self::REGEX_ALFABETICO],
         ], [
             'nombre.required' => 'El nombre es obligatorio.',
-            'nombre.unique'   => 'Ya existe un registro con ese nombre.',
-            'nombre.regex'    => 'El nombre solo puede contener letras, espacios y guiones.',
+            'nombre.unique' => 'Ya existe un registro con ese nombre.',
+            'nombre.regex' => 'El nombre solo puede contener letras, espacios y guiones.',
         ]);
 
         $registro->update($data);
