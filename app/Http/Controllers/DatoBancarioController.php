@@ -13,6 +13,7 @@ class DatoBancarioController extends Controller
     public function index()
     {
         $datos = DatoBancario::all();
+
         return response()->json($datos);
     }
 
@@ -63,7 +64,7 @@ class DatoBancarioController extends Controller
      */
     public function show(string $tipo)
     {
-        if (!in_array($tipo, ['pago_movil', 'transferencia'])) {
+        if (! in_array($tipo, ['pago_movil', 'transferencia'])) {
             return response()->json([
                 'message' => 'Tipo no válido.',
             ], 422);
@@ -71,7 +72,7 @@ class DatoBancarioController extends Controller
 
         $dato = DatoBancario::where('tipo', $tipo)->first();
 
-        if (!$dato) {
+        if (! $dato) {
             return response()->json(null, 200);
         }
 
@@ -84,6 +85,7 @@ class DatoBancarioController extends Controller
     public function all()
     {
         $datos = DatoBancario::all();
+
         return response()->json($datos);
     }
 }
