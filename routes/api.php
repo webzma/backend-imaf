@@ -6,6 +6,7 @@ use App\Http\Controllers\CatalogoController;
 use App\Http\Controllers\CertificadoController;
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DatoBancarioController;
 use App\Http\Controllers\EstudianteController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PagoController;
@@ -74,6 +75,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('pagos/{id}', [PagoController::class, 'update']);
         Route::delete('pagos/{id}', [PagoController::class, 'destroy']);
 
+        // Datos Bancarios (admin)
+        Route::get('datos-bancarios', [DatoBancarioController::class, 'index']);
+        Route::post('datos-bancarios', [DatoBancarioController::class, 'store']);
+
         // Certificados
         Route::get('estudiantes/{id}/certificado', [CertificadoController::class, 'download']);
 
@@ -113,6 +118,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('notificaciones/{id}/read', [NotificationController::class, 'markAsRead']);
         Route::post('notificaciones/mark-all-read', [NotificationController::class, 'markAllAsRead']);
     });
+
+    // Datos bancarios (público para estudiantes logueados)
+    Route::get('datos-bancarios', [DatoBancarioController::class, 'all']);
+    Route::get('datos-bancarios/{tipo}', [DatoBancarioController::class, 'show']);
 
     // Solo estudiante
     Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {
