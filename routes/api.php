@@ -28,10 +28,16 @@ Route::middleware('throttle:10,1')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    Route::put('/me', [AuthController::class, 'actualizarPerfil']);
 
     // Solo admin
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('dashboard', [DashboardController::class, 'index']);
+
+        // Los `resumen` van antes de sus `apiResource`: si no, Laravel casa
+        // `estudiantes/resumen` con `estudiantes/{id}` y busca el id "resumen".
+        Route::get('estudiantes/resumen', [EstudianteController::class, 'resumen']);
+        Route::patch('estudiantes/estado-masivo', [EstudianteController::class, 'estadoMasivo']);
         Route::apiResource('estudiantes', EstudianteController::class);
         Route::patch('estudiantes/{id}/estado-pago', [EstudianteController::class, 'updateEstadoPago']);
         Route::get('notificaciones', [NotificationController::class, 'index']);
@@ -40,6 +46,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('notificaciones/mark-all-read', [NotificationController::class, 'markAllAsRead']);
         Route::post('notificaciones/send', [NotificationController::class, 'send']);
 
+        Route::get('profesores/resumen', [ProfesorController::class, 'resumen']);
         Route::apiResource('profesores', ProfesorController::class);
         Route::get('tipo-contratos', [ProfesorController::class, 'getTipoContratos']);
         Route::get('especialidades', [ProfesorController::class, 'getEspecialidades']);
@@ -47,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('titulos', [ProfesorController::class, 'getTitulos']);
 
         // Cursos (antes de las rutas genéricas {slug} para evitar conflicto)
+        Route::get('cursos/resumen', [CursoController::class, 'resumen']);
         Route::apiResource('cursos', CursoController::class);
 
         // Temario y sesiones de cursos
@@ -72,6 +80,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Pagos Admin
         Route::get('pagos', [PagoController::class, 'index']);
+        Route::get('pagos/resumen', [PagoController::class, 'resumen']);
+        Route::patch('pagos/masivo', [PagoController::class, 'updateMasivo']);
         Route::put('pagos/{id}', [PagoController::class, 'update']);
         Route::delete('pagos/{id}', [PagoController::class, 'destroy']);
 

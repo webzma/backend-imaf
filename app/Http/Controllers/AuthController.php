@@ -123,6 +123,47 @@ class AuthController extends Controller
      * La respuesta es la misma sin importar si el correo existe o no,
      * para evitar la enumeración de usuarios.
      */
+    /**
+     * Actualiza el perfil de quien está autenticado.
+     *
+     * Existe porque el administrador era el único rol sin pantalla de perfil:
+     * no podía corregir su nombre ni cambiar su contraseña desde la
+     * plataforma. Cambiar la contraseña exige la actual aunque haya sesión
+     * abierta: un equipo desatendido no debe bastar para tomar la cuenta.
+     */
+    public function actualizarPerfil(Request $request)
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'primer_nombre' => ['sometimes', 'required', 'string', 'max:100', self::REGEX_NOMBRES],
+            'segundo_nombre' => ['nullable', 'string', 'max:100', self::REGEX_NOMBRES],
+            'primer_apellido' => ['sometimes', 'required', 'string', 'max:100', self::REGEX_NOMBRES],
+            'segundo_apellido' => ['sometimes', 'required', 'string', 'max:100', self::REGEX_NOMBRES],
+            'email' => ['sometimes', 'required', 'email', 'unique:users,email,'.$user->id],
+            'password_actual' => ['required_with:password', 'string'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
+        ], $this->mensajesTipoDato());
+
+        if (! empty($data['password'])) {
+            if (! Hash::check($data['password_actual'], $user->password)) {
+                throw ValidationException::withMessages([
+                    'password_actual' => ['La contraseña actual no es correcta.'],
+                ]);
+            }
+
+            $user->password = $data['password'];
+        }
+
+        $user->fill(array_intersect_key($data, array_flip([
+            'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email',
+        ])));
+
+        $user->save();
+
+        return response()->json($user->fresh());
+    }
+
     public function forgotPassword(Request $request)
     {
         $request->validate([

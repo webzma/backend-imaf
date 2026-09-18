@@ -16,17 +16,30 @@ use Illuminate\Support\Facades\Hash;
 
 class EstudianteController extends Controller
 {
+    /** Columnas por las que la tabla del panel puede ordenar. */
+    private const ORDEN_ESTUDIANTES = [
+        'nombre' => 'nombre',
+        'cedula' => 'cedula',
+        'fecha_inscripcion' => 'fecha_inscripcion',
+        'estado' => 'estado',
+    ];
+
     public function index(Request $request)
     {
         $query = Estudiante::with('user', 'curso');
 
         $this->acotarAlProfesor($query, $request->user());
 
-        if ($request->filled('search')) {
-            $search = $request->search;
+        // La búsqueda cubre lo que la tabla muestra: nombre, cédula y correo.
+        // Antes solo miraba `nombre` y `cedula`, así que buscar por el correo
+        // que aparece bajo el nombre no devolvía nada.
+        if ($search = $this->terminoBusqueda($request)) {
             $query->where(function ($q) use ($search) {
                 $q->where('nombre', 'like', "%{$search}%")
-                    ->orWhere('cedula', 'like', "%{$search}%");
+                    ->orWhere('cedula', 'like', "%{$search}%")
+                    ->orWhereHas('user', fn ($u) => $u->where('email', 'like', "%{$search}%"))
+                    ->orWhereHas('curso', fn ($c) => $c->where('nombre', 'like', "%{$search}%")
+                        ->orWhere('codigo', 'like', "%{$search}%"));
             });
         }
 
@@ -34,15 +47,51 @@ class EstudianteController extends Controller
             $query->where('estado', $request->estado);
         }
 
+        // `sin_curso` / `sin_municipio` son filtros reales, no la ausencia de
+        // filtro: la UI necesita poder listar a quien no tiene curso asignado.
         if ($request->filled('curso_id')) {
-            $query->where('curso_id', $request->curso_id);
+            $request->curso_id === 'sin_curso'
+                ? $query->whereNull('curso_id')
+                : $query->where('curso_id', $request->curso_id);
+        }
+
+        if ($request->filled('municipio')) {
+            $request->municipio === 'sin_municipio'
+                ? $query->whereNull('municipio')
+                : $query->where('municipio', $request->municipio);
         }
 
         if ($request->filled('estado_pago')) {
             $query->where('estado_pago', $request->estado_pago);
         }
 
+        $this->aplicarOrden($query, $request, self::ORDEN_ESTUDIANTES, 'nombre');
+
         return response()->json($query->paginate($this->registrosPorPagina($request)));
+    }
+
+    /**
+     * Totales de la lista completa, no de la página visible.
+     *
+     * Las tarjetas de resumen contaban sobre los 10 registros cargados, así
+     * que con 300 estudiantes decían "10". Respeta los mismos filtros que
+     * `index` para que el resumen describa lo que se está viendo.
+     */
+    public function resumen(Request $request)
+    {
+        $query = Estudiante::query();
+        $this->acotarAlProfesor($query, $request->user());
+
+        if ($request->filled('curso_id') && $request->curso_id !== 'sin_curso') {
+            $query->where('curso_id', $request->curso_id);
+        }
+
+        return response()->json([
+            'total' => (clone $query)->count(),
+            'activos' => (clone $query)->where('estado', 'activo')->count(),
+            'inactivos' => (clone $query)->where('estado', 'inactivo')->count(),
+            'graduados' => (clone $query)->where('estado', 'graduado')->count(),
+        ]);
     }
 
     public function store(Request $request)
@@ -94,6 +143,27 @@ class EstudianteController extends Controller
         });
 
         return response()->json($estudiante->load('user', 'curso'), 201);
+    }
+
+    /**
+     * Cambia el estado de varios estudiantes de una vez.
+     *
+     * `update` exige el registro completo (municipio y dirección incluidos),
+     * así que no servía para tocar solo el estado: graduar a una promoción
+     * obligaba a abrir y reenviar quince formularios enteros.
+     */
+    public function estadoMasivo(Request $request)
+    {
+        $datos = $request->validate([
+            'ids' => 'required|array|min:1|max:200',
+            'ids.*' => 'integer|exists:estudiantes,id',
+            'estado' => 'required|in:activo,inactivo,graduado',
+        ]);
+
+        $actualizados = Estudiante::whereIn('id', $datos['ids'])
+            ->update(['estado' => $datos['estado']]);
+
+        return response()->json(['actualizados' => $actualizados]);
     }
 
     public function showMe()

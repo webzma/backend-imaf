@@ -118,9 +118,32 @@ class PagoController extends Controller
     }
 
     // Admin: listar todos los pagos
+    /**
+     * Orden por defecto: lo que hay que atender primero.
+     *
+     * Un pendiente es trabajo sin hacer; un aprobado o rechazado es historial.
+     * Esta prioridad estaba en el cliente, ordenando solo los 20 registros que
+     * tenía en memoria, así que un pendiente antiguo nunca subía a la vista.
+     */
+    private const ORDEN_PAGOS = [
+        'prioridad' => null,
+        'fecha' => 'created_at',
+        'estado' => 'estado',
+    ];
+
     public function index(Request $request)
     {
-        $query = Pago::with(['user', 'curso', 'estudiante'])->latest();
+        $query = Pago::with(['user', 'curso', 'estudiante']);
+
+        if ($search = $this->terminoBusqueda($request)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('referencia', 'like', "%{$search}%")
+                    ->orWhereHas('estudiante', fn ($e) => $e->where('nombre', 'like', "%{$search}%")
+                        ->orWhere('cedula', 'like', "%{$search}%"))
+                    ->orWhereHas('curso', fn ($c) => $c->where('nombre', 'like', "%{$search}%")
+                        ->orWhere('codigo', 'like', "%{$search}%"));
+            });
+        }
 
         if ($request->filled('estado')) {
             $query->where('estado', $request->estado);
@@ -138,11 +161,34 @@ class PagoController extends Controller
             $query->whereDate('created_at', '<=', $request->fecha_hasta);
         }
 
-        $pagos = $query->paginate(20);
+        $sort = (string) $request->query('sort', 'prioridad');
+
+        if ($sort === 'prioridad' || ! array_key_exists($sort, self::ORDEN_PAGOS)) {
+            $query->orderByRaw("CASE estado WHEN 'pendiente' THEN 0 WHEN 'aprobado' THEN 1 ELSE 2 END")
+                ->latest();
+        } else {
+            $this->aplicarOrden($query, $request, array_filter(self::ORDEN_PAGOS), 'fecha', 'desc');
+        }
+
+        // `per_page` fijo en 20 ignoraba lo que pedía el cliente, así que la UI
+        // recibía 20 filas, las partía en dos páginas de 10 propias y jamás
+        // llegaba a la tercera.
+        $pagos = $query->paginate($this->registrosPorPagina($request));
 
         $pagos->getCollection()->transform(fn ($pago) => $this->formatPago($pago));
 
         return response()->json($pagos);
+    }
+
+    /** Totales por estado sobre la tabla completa, para las tarjetas de resumen. */
+    public function resumen()
+    {
+        return response()->json([
+            'total' => Pago::count(),
+            'pendiente' => Pago::where('estado', 'pendiente')->count(),
+            'aprobado' => Pago::where('estado', 'aprobado')->count(),
+            'rechazado' => Pago::where('estado', 'rechazado')->count(),
+        ]);
     }
 
     // Admin: aprobar o rechazar pago
@@ -155,13 +201,70 @@ class PagoController extends Controller
 
         $pago = Pago::with(['user', 'curso', 'estudiante'])->findOrFail($id);
 
+        $resultado = $this->procesarPago($pago, $request->estado, $request->nota_admin);
+
+        if (! $resultado['ok']) {
+            return response()->json(['message' => $resultado['message']], 422);
+        }
+
+        return response()->json([
+            'message' => $resultado['message'],
+            'pago' => $this->formatPago($pago),
+        ]);
+    }
+
+    /**
+     * Aprueba o rechaza varios pagos de una vez.
+     *
+     * Revisar la cola de pagos era el trabajo más repetitivo del panel: doce
+     * pagos pendientes eran doce recorridos de abrir ficha, confirmar y
+     * cerrar. Cada pago se procesa por separado y con su propia transacción,
+     * así que uno que falle por cupo agotado no arrastra a los demás; la
+     * respuesta dice cuáles quedaron fuera y por qué.
+     */
+    public function updateMasivo(Request $request)
+    {
+        $datos = $request->validate([
+            'ids' => 'required|array|min:1|max:100',
+            'ids.*' => 'integer|exists:pagos,id',
+            'estado' => 'required|in:aprobado,rechazado',
+            'nota_admin' => 'nullable|string|max:500',
+        ]);
+
+        $procesados = 0;
+        $fallidos = [];
+
+        foreach (Pago::with(['user', 'curso', 'estudiante'])->whereIn('id', $datos['ids'])->get() as $pago) {
+            $resultado = $this->procesarPago($pago, $datos['estado'], $datos['nota_admin'] ?? null);
+
+            if ($resultado['ok']) {
+                $procesados++;
+            } else {
+                $fallidos[] = ['id' => $pago->id, 'message' => $resultado['message']];
+            }
+        }
+
+        return response()->json([
+            'procesados' => $procesados,
+            'fallidos' => $fallidos,
+        ]);
+    }
+
+    /**
+     * Aplica la decisión sobre un pago: cupo, estado del estudiante y aviso al
+     * instructor. Es el único sitio donde se decide qué implica aprobar.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    private function procesarPago(Pago $pago, string $estado, ?string $nota): array
+    {
         $cupoAgotado = false;
 
-        DB::transaction(function () use ($pago, $request, &$cupoAgotado) {
+        DB::transaction(function () use ($pago, $estado, $nota, &$cupoAgotado) {
             // Bloquear el curso para evitar aprobaciones simultáneas que excedan el cupo
             $curso = Curso::lockForUpdate()->findOrFail($pago->curso_id);
 
-            if ($request->estado === 'aprobado') {
+            if ($estado === 'aprobado') {
                 $ocupados = Estudiante::where('curso_id', $curso->id)->count();
                 if ($ocupados >= $curso->limite_cupo) {
                     $cupoAgotado = true;
@@ -171,20 +274,20 @@ class PagoController extends Controller
             }
 
             $pago->update([
-                'estado' => $request->estado,
-                'nota_admin' => $request->nota_admin,
+                'estado' => $estado,
+                'nota_admin' => $nota,
             ]);
 
             $estudiante = Estudiante::where('user_id', $pago->user_id)->first();
 
             if ($estudiante) {
-                if ($request->estado === 'aprobado') {
+                if ($estado === 'aprobado') {
                     $estudiante->update([
                         'curso_id' => $pago->curso_id,
                         'estado_pago' => 'aprobado',
                         'estado' => 'activo',
                     ]);
-                } elseif ($request->estado === 'rechazado') {
+                } elseif ($estado === 'rechazado') {
                     $estudiante->update([
                         'estado_pago' => 'reprobado',
                     ]);
@@ -193,15 +296,16 @@ class PagoController extends Controller
         });
 
         if ($cupoAgotado) {
-            return response()->json([
+            return [
+                'ok' => false,
                 'message' => 'No se puede aprobar: el curso ya no tiene cupos disponibles.',
-            ], 422);
+            ];
         }
 
         $pago->refresh();
 
         // Si el pago fue aprobado, notificar al profesor del curso
-        if ($request->estado === 'aprobado') {
+        if ($estado === 'aprobado') {
             $curso = Curso::find($pago->curso_id);
             if ($curso && $curso->profesor_id) {
                 $profesor = Profesor::with('user')->find($curso->profesor_id);
@@ -216,10 +320,7 @@ class PagoController extends Controller
             }
         }
 
-        return response()->json([
-            'message' => "Pago {$request->estado} con éxito.",
-            'pago' => $this->formatPago($pago),
-        ]);
+        return ['ok' => true, 'message' => "Pago {$estado} con éxito."];
     }
 
     // Admin: eliminar pago (y su comprobante)

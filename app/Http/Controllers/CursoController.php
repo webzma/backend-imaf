@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\CursoResumenResource;
 use App\Models\Curso;
+use App\Models\Estudiante;
 use App\Models\Profesor;
 use App\Notifications\GenericNotification;
 use App\Rules\DiaHabil;
@@ -13,14 +14,55 @@ use Illuminate\Validation\Rule;
 
 class CursoController extends Controller
 {
+    /** Columnas por las que la tabla del panel puede ordenar. */
+    private const ORDEN_CURSOS = [
+        'nombre' => 'nombre',
+        'codigo' => 'codigo',
+        'fecha_inicio' => 'fecha_inicio',
+        'precio' => 'precio',
+        'estado' => 'estado',
+    ];
+
     public function index(Request $request)
     {
         CursoEstadoService::sincronizarConCache();
 
-        return response()->json(
-            Curso::with('instructor.user', 'estudiantes.user')
-                ->paginate($this->registrosPorPagina($request))
-        );
+        $query = Curso::with('instructor.user', 'estudiantes.user');
+
+        if ($search = $this->terminoBusqueda($request)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('nombre', 'like', "%{$search}%")
+                    ->orWhere('codigo', 'like', "%{$search}%")
+                    ->orWhere('descripcion', 'like', "%{$search}%")
+                    ->orWhereHas('instructor.user', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->estado);
+        }
+
+        if ($request->filled('profesor_id')) {
+            $request->profesor_id === 'sin_instructor'
+                ? $query->whereNull('profesor_id')
+                : $query->where('profesor_id', $request->profesor_id);
+        }
+
+        $this->aplicarOrden($query, $request, self::ORDEN_CURSOS, 'nombre');
+
+        return response()->json($query->paginate($this->registrosPorPagina($request)));
+    }
+
+    /** Totales sobre la tabla completa, para las tarjetas de resumen. */
+    public function resumen()
+    {
+        return response()->json([
+            'total' => Curso::count(),
+            'activos' => Curso::where('estado', 'activo')->count(),
+            'inactivos' => Curso::where('estado', 'inactivo')->count(),
+            'estudiantes' => Estudiante::whereNotNull('curso_id')->count(),
+            'con_estudiantes' => Curso::has('estudiantes')->count(),
+        ]);
     }
 
     public function indexActivos(Request $request)

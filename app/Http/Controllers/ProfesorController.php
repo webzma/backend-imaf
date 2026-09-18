@@ -16,12 +16,71 @@ use Illuminate\Support\Facades\Hash;
 
 class ProfesorController extends Controller
 {
+    /**
+     * Columnas ordenables. El nombre vive en `users`, así que se ordena por
+     * subconsulta en vez de arrastrar un join a toda la lista.
+     */
+    private function ordenProfesores(): array
+    {
+        return [
+            'nombre' => fn ($q, $dir) => $q->orderBy(
+                User::select('name')->whereColumn('users.id', 'profesores.user_id'),
+                $dir
+            ),
+            'cedula' => 'cedula',
+            'municipio' => 'municipio',
+        ];
+    }
+
     public function index(Request $request)
     {
-        return response()->json(
-            Profesor::with('user', 'tipoContrato', 'especialidad', 'departamento', 'titulo')
-                ->paginate($this->registrosPorPagina($request))
-        );
+        $query = Profesor::with('user', 'tipoContrato', 'especialidad', 'departamento', 'titulo');
+
+        // Los filtros se resuelven en la base de datos. Antes la pantalla
+        // filtraba en memoria sobre los 10 registros de la página actual, de
+        // modo que buscar a alguien de la página 4 daba "sin resultados".
+        if ($search = $this->terminoBusqueda($request)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('cedula', 'like', "%{$search}%")
+                    ->orWhereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%"))
+                    ->orWhereHas('especialidad', fn ($e) => $e->where('nombre', 'like', "%{$search}%"))
+                    ->orWhereHas('departamento', fn ($d) => $d->where('nombre', 'like', "%{$search}%"));
+            });
+        }
+
+        foreach (['titulo_id', 'departamento_id', 'especialidad_id', 'tipo_contrato_id'] as $filtro) {
+            if (! $request->filled($filtro)) {
+                continue;
+            }
+
+            str_starts_with((string) $request->input($filtro), 'sin_')
+                ? $query->whereNull($filtro)
+                : $query->where($filtro, $request->input($filtro));
+        }
+
+        if ($request->filled('municipio')) {
+            $request->municipio === 'sin_municipio'
+                ? $query->whereNull('municipio')
+                : $query->where('municipio', $request->municipio);
+        }
+
+        $this->aplicarOrden($query, $request, $this->ordenProfesores(), 'nombre');
+
+        return response()->json($query->paginate($this->registrosPorPagina($request)));
+    }
+
+    /** Totales sobre la tabla completa, para las tarjetas de resumen. */
+    public function resumen()
+    {
+        return response()->json([
+            'total' => Profesor::count(),
+            'con_titulo' => Profesor::whereNotNull('titulo_id')->count(),
+            'departamentos' => Profesor::whereNotNull('departamento_id')
+                ->distinct('departamento_id')
+                ->count('departamento_id'),
+            'con_contrato' => Profesor::whereNotNull('tipo_contrato_id')->count(),
+        ]);
     }
 
     public function getTipoContratos()

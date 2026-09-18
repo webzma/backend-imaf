@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Http\Request;
 
 abstract class Controller
@@ -63,5 +64,62 @@ abstract class Controller
             'telefono.regex' => 'El teléfono solo puede contener dígitos numéricos.',
             'direccion.regex' => 'La dirección contiene caracteres no permitidos.',
         ];
+    }
+
+    /**
+     * Aplica `?sort=&direction=` sobre una lista blanca de columnas.
+     *
+     * La lista blanca no es opcional: `sort` viene del cliente y acaba dentro
+     * de un ORDER BY, así que aceptar cualquier cadena sería inyección de SQL.
+     * Cada clave del mapa es el nombre que usa la UI y su valor es la columna
+     * real (o un closure que ordena por una relación).
+     *
+     * @param  array<string, string|callable>  $columnas
+     */
+    protected function aplicarOrden(
+        Builder $query,
+        Request $request,
+        array $columnas,
+        string $porDefecto,
+        string $direccionPorDefecto = 'asc',
+    ): void {
+        $sort = (string) $request->query('sort', '');
+        $direccion = strtolower((string) $request->query('direction', ''));
+
+        if (! array_key_exists($sort, $columnas)) {
+            $sort = $porDefecto;
+            $direccion = $direccion !== '' ? $direccion : $direccionPorDefecto;
+        }
+
+        $direccion = in_array($direccion, ['asc', 'desc'], true) ? $direccion : $direccionPorDefecto;
+
+        $columna = $columnas[$sort] ?? null;
+
+        if (is_callable($columna)) {
+            $columna($query, $direccion);
+
+            return;
+        }
+
+        if (is_string($columna)) {
+            $query->orderBy($columna, $direccion);
+        }
+    }
+
+    /**
+     * Término de búsqueda saneado.
+     *
+     * `%` y `_` son comodines de LIKE: sin escaparlos, buscar "100%" devuelve
+     * la tabla entera.
+     */
+    protected function terminoBusqueda(Request $request, string $campo = 'search'): ?string
+    {
+        $valor = trim((string) $request->query($campo, ''));
+
+        if ($valor === '') {
+            return null;
+        }
+
+        return str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $valor);
     }
 }
