@@ -1,5 +1,10 @@
 *.log
 .DS_Store
+
+# Volcados de base de datos: contienen datos personales de estudiantes
+# (cedula, direccion, telefono) y tokens de sesion. Nunca se versionan.
+*.sql
+!database/**/*.sql
 .env
 .env.backup
 .env.production
