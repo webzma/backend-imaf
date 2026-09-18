@@ -17,253 +17,253 @@ use App\Http\Controllers\TemarioController;
 use Illuminate\Support\Facades\Route;
 
 // Rutas públicas
-Route::middleware("throttle:10,1")->group(function () {
-    Route::post("/register", [AuthController::class, "register"]);
-    Route::post("/login", [AuthController::class, "login"]);
-    Route::post("/forgot-password", [AuthController::class, "forgotPassword"]);
-    Route::post("/reset-password", [AuthController::class, "resetPassword"]);
+Route::middleware('throttle:10,1')->group(function () {
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 });
 
 // Rutas protegidas (requieren token)
-Route::middleware("auth:sanctum")->group(function () {
-    Route::post("/logout", [AuthController::class, "logout"]);
-    Route::get("/me", [AuthController::class, "me"]);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
 
     // Solo admin
-    Route::middleware("role:admin")
-        ->prefix("admin")
+    Route::middleware('role:admin')
+        ->prefix('admin')
         ->group(function () {
-            Route::get("dashboard", [DashboardController::class, "index"]);
-            Route::apiResource("estudiantes", EstudianteController::class);
-            Route::patch("estudiantes/{id}/estado-pago", [
+            Route::get('dashboard', [DashboardController::class, 'index']);
+            Route::apiResource('estudiantes', EstudianteController::class);
+            Route::patch('estudiantes/{id}/estado-pago', [
                 EstudianteController::class,
-                "updateEstadoPago",
+                'updateEstadoPago',
             ]);
-            Route::get("notificaciones", [
+            Route::get('notificaciones', [
                 NotificationController::class,
-                "index",
+                'index',
             ]);
-            Route::get("notificaciones/count", [
+            Route::get('notificaciones/count', [
                 NotificationController::class,
-                "unreadCount",
+                'unreadCount',
             ]);
-            Route::post("notificaciones/{id}/read", [
+            Route::post('notificaciones/{id}/read', [
                 NotificationController::class,
-                "markAsRead",
+                'markAsRead',
             ]);
-            Route::post("notificaciones/mark-all-read", [
+            Route::post('notificaciones/mark-all-read', [
                 NotificationController::class,
-                "markAllAsRead",
+                'markAllAsRead',
             ]);
-            Route::post("notificaciones/send", [
+            Route::post('notificaciones/send', [
                 NotificationController::class,
-                "send",
+                'send',
             ]);
 
-            Route::apiResource("profesores", ProfesorController::class);
-            Route::get("tipo-contratos", [
+            Route::apiResource('profesores', ProfesorController::class);
+            Route::get('tipo-contratos', [
                 ProfesorController::class,
-                "getTipoContratos",
+                'getTipoContratos',
             ]);
-            Route::get("especialidades", [
+            Route::get('especialidades', [
                 ProfesorController::class,
-                "getEspecialidades",
+                'getEspecialidades',
             ]);
-            Route::get("departamentos", [
+            Route::get('departamentos', [
                 ProfesorController::class,
-                "getDepartamentos",
+                'getDepartamentos',
             ]);
-            Route::get("titulos", [ProfesorController::class, "getTitulos"]);
+            Route::get('titulos', [ProfesorController::class, 'getTitulos']);
 
             // Cursos (antes de las rutas genéricas {slug} para evitar conflicto)
-            Route::apiResource("cursos", CursoController::class);
+            Route::apiResource('cursos', CursoController::class);
 
             // Temario y sesiones de cursos
-            Route::get("cursos/{cursoId}/temario", [
+            Route::get('cursos/{cursoId}/temario', [
                 TemarioController::class,
-                "index",
+                'index',
             ]);
-            Route::post("cursos/{cursoId}/temario", [
+            Route::post('cursos/{cursoId}/temario', [
                 TemarioController::class,
-                "store",
+                'store',
             ]);
-            Route::put("cursos/{cursoId}/temario/{id}", [
+            Route::put('cursos/{cursoId}/temario/{id}', [
                 TemarioController::class,
-                "update",
+                'update',
             ]);
-            Route::delete("cursos/{cursoId}/temario/{id}", [
+            Route::delete('cursos/{cursoId}/temario/{id}', [
                 TemarioController::class,
-                "destroy",
+                'destroy',
             ]);
 
-            Route::get("cursos/{cursoId}/sesiones", [
+            Route::get('cursos/{cursoId}/sesiones', [
                 SesionController::class,
-                "index",
+                'index',
             ]);
-            Route::post("cursos/{cursoId}/sesiones", [
+            Route::post('cursos/{cursoId}/sesiones', [
                 SesionController::class,
-                "store",
+                'store',
             ]);
-            Route::put("cursos/{cursoId}/sesiones/{id}", [
+            Route::put('cursos/{cursoId}/sesiones/{id}', [
                 SesionController::class,
-                "update",
+                'update',
             ]);
-            Route::delete("cursos/{cursoId}/sesiones/{id}", [
+            Route::delete('cursos/{cursoId}/sesiones/{id}', [
                 SesionController::class,
-                "destroy",
+                'destroy',
             ]);
 
             // Horario / Calendario (sesiones globales)
-            Route::get("horario", [SesionController::class, "horario"]);
-            Route::post("sesiones", [SesionController::class, "storeGlobal"]);
-            Route::put("sesiones/{id}", [
+            Route::get('horario', [SesionController::class, 'horario']);
+            Route::post('sesiones', [SesionController::class, 'storeGlobal']);
+            Route::put('sesiones/{id}', [
                 SesionController::class,
-                "updateGlobal",
+                'updateGlobal',
             ]);
-            Route::delete("sesiones/{id}", [
+            Route::delete('sesiones/{id}', [
                 SesionController::class,
-                "destroyGlobal",
+                'destroyGlobal',
             ]);
 
             // Asistencia por sesión
-            Route::get("sesiones/{sesionId}/asistencia", [
+            Route::get('sesiones/{sesionId}/asistencia', [
                 AsistenciaController::class,
-                "show",
+                'show',
             ]);
-            Route::post("sesiones/{sesionId}/asistencia", [
+            Route::post('sesiones/{sesionId}/asistencia', [
                 AsistenciaController::class,
-                "store",
+                'store',
             ]);
 
             // Pagos Admin
-            Route::get("pagos", [PagoController::class, "index"]);
-            Route::put("pagos/{id}", [PagoController::class, "update"]);
-            Route::delete("pagos/{id}", [PagoController::class, "destroy"]);
+            Route::get('pagos', [PagoController::class, 'index']);
+            Route::put('pagos/{id}', [PagoController::class, 'update']);
+            Route::delete('pagos/{id}', [PagoController::class, 'destroy']);
 
             // Datos Bancarios (admin)
-            Route::get("datos-bancarios", [
+            Route::get('datos-bancarios', [
                 DatoBancarioController::class,
-                "index",
+                'index',
             ]);
-            Route::post("datos-bancarios", [
+            Route::post('datos-bancarios', [
                 DatoBancarioController::class,
-                "store",
+                'store',
             ]);
             // Certificados
-            Route::get("estudiantes/{id}/certificado", [
+            Route::get('estudiantes/{id}/certificado', [
                 CertificadoController::class,
-                "download",
+                'download',
             ]);
 
             // Reportes
-            Route::get("reportes", [ReporteController::class, "index"]);
+            Route::get('reportes', [ReporteController::class, 'index']);
 
             // Catálogos CRUD (DEBE ser la última ruta del grupo admin, después de todas las rutas explícitas)
-            Route::get("{slug}", [CatalogoController::class, "index"]);
-            Route::post("{slug}", [CatalogoController::class, "store"]);
-            Route::put("{slug}/{id}", [CatalogoController::class, "update"]);
-            Route::delete("{slug}/{id}", [
+            Route::get('{slug}', [CatalogoController::class, 'index']);
+            Route::post('{slug}', [CatalogoController::class, 'store']);
+            Route::put('{slug}/{id}', [CatalogoController::class, 'update']);
+            Route::delete('{slug}/{id}', [
                 CatalogoController::class,
-                "destroy",
+                'destroy',
             ]);
         });
 
     // Profesor y admin
-    Route::middleware("role:admin,profesor")->group(function () {
-        Route::get("cursos", [CursoController::class, "index"]);
-        Route::get("cursos/{id}", [CursoController::class, "show"]);
-        Route::get("estudiantes", [EstudianteController::class, "index"]);
-        Route::get("estudiantes/{id}", [EstudianteController::class, "show"]);
+    Route::middleware('role:admin,profesor')->group(function () {
+        Route::get('cursos', [CursoController::class, 'index']);
+        Route::get('cursos/{id}', [CursoController::class, 'show']);
+        Route::get('estudiantes', [EstudianteController::class, 'index']);
+        Route::get('estudiantes/{id}', [EstudianteController::class, 'show']);
 
         // Asistencia accesible por admin y profesor (con autorización interna por curso)
-        Route::get("sesiones/{sesionId}/asistencia", [
+        Route::get('sesiones/{sesionId}/asistencia', [
             AsistenciaController::class,
-            "show",
+            'show',
         ]);
-        Route::post("sesiones/{sesionId}/asistencia", [
+        Route::post('sesiones/{sesionId}/asistencia', [
             AsistenciaController::class,
-            "store",
+            'store',
         ]);
     });
 
     // Solo profesor
-    Route::middleware("role:profesor")
-        ->prefix("profesor")
+    Route::middleware('role:profesor')
+        ->prefix('profesor')
         ->group(function () {
-            Route::get("cursos", [CursoController::class, "misCursos"]);
-            Route::put("perfil/{id}", [ProfesorController::class, "update"]);
-            Route::post("perfil/foto", [
+            Route::get('cursos', [CursoController::class, 'misCursos']);
+            Route::put('perfil/{id}', [ProfesorController::class, 'update']);
+            Route::post('perfil/foto', [
                 ProfesorController::class,
-                "uploadFotoMe",
+                'uploadFotoMe',
             ]);
 
             // Cronograma / Horario del instructor (solo sus sesiones)
-            Route::get("horario", [SesionController::class, "horarioProfesor"]);
-            Route::patch("estudiantes/{id}/aprobacion-curso", [
+            Route::get('horario', [SesionController::class, 'horarioProfesor']);
+            Route::patch('estudiantes/{id}/aprobacion-curso', [
                 EstudianteController::class,
-                "updateAprobacionCurso",
+                'updateAprobacionCurso',
             ]);
-            Route::get("notificaciones", [
+            Route::get('notificaciones', [
                 NotificationController::class,
-                "index",
+                'index',
             ]);
-            Route::get("notificaciones/count", [
+            Route::get('notificaciones/count', [
                 NotificationController::class,
-                "unreadCount",
+                'unreadCount',
             ]);
-            Route::post("notificaciones/{id}/read", [
+            Route::post('notificaciones/{id}/read', [
                 NotificationController::class,
-                "markAsRead",
+                'markAsRead',
             ]);
-            Route::post("notificaciones/mark-all-read", [
+            Route::post('notificaciones/mark-all-read', [
                 NotificationController::class,
-                "markAllAsRead",
+                'markAllAsRead',
             ]);
         });
 
     // Datos bancarios (público para estudiantes logueados)
-    Route::get("datos-bancarios", [DatoBancarioController::class, "all"]);
-    Route::get("datos-bancarios/{tipo}", [
+    Route::get('datos-bancarios', [DatoBancarioController::class, 'all']);
+    Route::get('datos-bancarios/{tipo}', [
         DatoBancarioController::class,
-        "show",
+        'show',
     ]);
 
     // Solo estudiante
-    Route::middleware("role:estudiante")
-        ->prefix("estudiante")
+    Route::middleware('role:estudiante')
+        ->prefix('estudiante')
         ->group(function () {
-            Route::get("cursos", [CursoController::class, "indexActivos"]);
-            Route::get("cursos/{id}", [CursoController::class, "show"]);
-            Route::get("curso", [EstudianteController::class, "miCurso"]);
-            Route::get("certificado", [
+            Route::get('cursos', [CursoController::class, 'indexActivos']);
+            Route::get('cursos/{id}', [CursoController::class, 'show']);
+            Route::get('curso', [EstudianteController::class, 'miCurso']);
+            Route::get('certificado', [
                 CertificadoController::class,
-                "downloadMe",
+                'downloadMe',
             ]);
-            Route::get("perfil", [EstudianteController::class, "showMe"]);
-            Route::put("perfil", [EstudianteController::class, "updateMe"]);
-            Route::post("perfil/foto", [
+            Route::get('perfil', [EstudianteController::class, 'showMe']);
+            Route::put('perfil', [EstudianteController::class, 'updateMe']);
+            Route::post('perfil/foto', [
                 EstudianteController::class,
-                "uploadFotoMe",
+                'uploadFotoMe',
             ]);
-            Route::get("notificaciones", [
+            Route::get('notificaciones', [
                 NotificationController::class,
-                "index",
+                'index',
             ]);
-            Route::get("notificaciones/count", [
+            Route::get('notificaciones/count', [
                 NotificationController::class,
-                "unreadCount",
+                'unreadCount',
             ]);
-            Route::post("notificaciones/{id}/read", [
+            Route::post('notificaciones/{id}/read', [
                 NotificationController::class,
-                "markAsRead",
+                'markAsRead',
             ]);
-            Route::post("notificaciones/mark-all-read", [
+            Route::post('notificaciones/mark-all-read', [
                 NotificationController::class,
-                "markAllAsRead",
+                'markAllAsRead',
             ]);
 
             // Pagos
-            Route::get("pagos", [PagoController::class, "studentIndex"]);
-            Route::post("pagos", [PagoController::class, "store"]);
+            Route::get('pagos', [PagoController::class, 'studentIndex']);
+            Route::post('pagos', [PagoController::class, 'store']);
         });
 });
