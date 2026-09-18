@@ -8,6 +8,7 @@ use App\Models\Sesion;
 use App\Models\User;
 use App\Notifications\SolicitudCursoProcesada;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,8 @@ class EstudianteController extends Controller
     public function index(Request $request)
     {
         $query = Estudiante::with('user', 'curso');
+
+        $this->acotarAlProfesor($query, $request->user());
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -217,11 +220,36 @@ class EstudianteController extends Controller
         return response()->json($estudiante->load('user', 'curso'));
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
-        $estudiante = Estudiante::with('user', 'curso')->findOrFail($id);
+        $query = Estudiante::with('user', 'curso');
+
+        $this->acotarAlProfesor($query, $request->user());
+
+        $estudiante = $query->findOrFail($id);
 
         return response()->json($estudiante);
+    }
+
+    /**
+     * Restringe una consulta de estudiantes a los inscritos en cursos que dicta
+     * el usuario, cuando ese usuario es profesor.
+     *
+     * Los endpoints `GET /estudiantes` y `GET /estudiantes/{id}` son compartidos
+     * por admin y profesor. Sin este filtro un instructor podría leer la cédula,
+     * la dirección y el teléfono de toda la base, no solo de sus alumnos. El
+     * admin conserva la vista completa.
+     */
+    private function acotarAlProfesor(Builder $query, ?User $usuario): void
+    {
+        if (! $usuario || ! $usuario->isProfesor()) {
+            return;
+        }
+
+        $query->whereHas(
+            'curso.instructor',
+            fn (Builder $q) => $q->where('user_id', $usuario->id)
+        );
     }
 
     public function update(Request $request, string $id)

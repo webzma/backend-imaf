@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Notifications\ResetPasswordNotification;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -150,6 +151,17 @@ class AuthController extends Controller
     }
 
     /**
+     * Minutos de validez del token de restablecimiento (config `auth.passwords`).
+     */
+    private function minutosExpiracionToken(): int
+    {
+        return (int) config(
+            'auth.passwords.'.config('auth.defaults.passwords').'.expire',
+            60
+        );
+    }
+
+    /**
      * Restablece la contraseña del usuario usando el token recibido por email.
      */
     public function resetPassword(Request $request)
@@ -164,7 +176,23 @@ class AuthController extends Controller
             ->where('email', $request->email)
             ->first();
 
-        if (! $record || ! Hash::check($request->token, $record->token)) {
+        $tokenInvalido = ! $record || ! Hash::check($request->token, $record->token);
+
+        // El token caduca a los `auth.passwords.*.expire` minutos de emitirse.
+        // Sin esta comprobación un enlace filtrado serviría para siempre, pese a
+        // que el correo anuncia una expiración.
+        $tokenExpirado = ! $tokenInvalido && Carbon::parse($record->created_at)
+            ->addMinutes($this->minutosExpiracionToken())
+            ->isPast();
+
+        if ($tokenInvalido || $tokenExpirado) {
+            // Un token caducado se descarta para que no quede en la tabla.
+            if ($tokenExpirado) {
+                DB::table('password_reset_tokens')
+                    ->where('email', $request->email)
+                    ->delete();
+            }
+
             throw ValidationException::withMessages([
                 'email' => ['El token de restablecimiento es inválido o ha expirado.'],
             ]);
@@ -175,6 +203,11 @@ class AuthController extends Controller
         $user->password = $request->password;
         $user->setRememberToken(Str::random(60));
         $user->save();
+
+        // Cambiar la contraseña cierra cualquier otra sesión abierta: si la cuenta
+        // estaba comprometida, el token robado deja de servir. Es la misma política
+        // de sesión única que aplica `login()`.
+        $user->tokens()->delete();
 
         event(new PasswordReset($user));
 
