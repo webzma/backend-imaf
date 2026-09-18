@@ -17,21 +17,60 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        $request->validate([
-            'primer_nombre' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
-            'segundo_nombre' => ['nullable', 'string', 'max:100', self::REGEX_NOMBRES],
-            'primer_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
-            'segundo_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
-            'email' => 'required|email|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-            'nacionalidad' => 'required|in:V,E',
-            'cedula' => ['required', 'string', 'max:15', 'unique:estudiantes,cedula', self::REGEX_CEDULA],
-            'telefono' => ['required', 'string', 'max:20', self::REGEX_NUMERICO],
-            'municipio' => 'nullable|string|max:255',
-            'direccion' => ['required', 'string', 'max:255', self::REGEX_DIRECCION],
-            'fecha_nacimiento' => 'required|date',
-            'genero' => 'required|in:masculino,femenino,otro',
-        ], $this->mensajesTipoDato());
+        $request->validate(
+            [
+                'primer_nombre' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'segundo_nombre' => [
+                    'nullable',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'primer_apellido' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'segundo_apellido' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'email' => 'required|email|unique:users',
+                'password' => 'required|string|min:8|confirmed',
+                'nacionalidad' => 'required|in:V,E',
+                'cedula' => [
+                    'required',
+                    'string',
+                    'max:15',
+                    'unique:estudiantes,cedula',
+                    self::REGEX_CEDULA,
+                ],
+                'telefono' => [
+                    'required',
+                    'string',
+                    'max:20',
+                    self::REGEX_NUMERICO,
+                ],
+                'municipio' => 'nullable|string|max:255',
+                'direccion' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    self::REGEX_DIRECCION,
+                ],
+                'fecha_nacimiento' => 'required|date',
+                'genero' => 'required|in:masculino,femenino,otro',
+            ],
+            $this->mensajesTipoDato(),
+        );
 
         $user = DB::transaction(function () use ($request) {
             $user = User::create([
@@ -63,10 +102,13 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'user' => $user->load('estudiante'),
-            'token' => $token,
-        ], 201);
+        return response()->json(
+            [
+                'user' => $user->load('estudiante'),
+                'token' => $token,
+            ],
+            201,
+        );
     }
 
     public function login(Request $request)
@@ -109,7 +151,13 @@ class AuthController extends Controller
 
         $profile = match ($user->role) {
             'estudiante' => $user->load('estudiante.curso'),
-            'profesor' => $user->load('profesor.tipoContrato', 'profesor.especialidad', 'profesor.titulo', 'profesor.departamento', 'profesor.cursos'),
+            'profesor' => $user->load(
+                'profesor.tipoContrato',
+                'profesor.especialidad',
+                'profesor.titulo',
+                'profesor.departamento',
+                'profesor.cursos',
+            ),
             default => $user,
         };
 
@@ -157,7 +205,7 @@ class AuthController extends Controller
     {
         return (int) config(
             'auth.passwords.'.config('auth.defaults.passwords').'.expire',
-            60
+            60,
         );
     }
 
@@ -176,14 +224,17 @@ class AuthController extends Controller
             ->where('email', $request->email)
             ->first();
 
-        $tokenInvalido = ! $record || ! Hash::check($request->token, $record->token);
+        $tokenInvalido =
+            ! $record || ! Hash::check($request->token, $record->token);
 
         // El token caduca a los `auth.passwords.*.expire` minutos de emitirse.
         // Sin esta comprobación un enlace filtrado serviría para siempre, pese a
         // que el correo anuncia una expiración.
-        $tokenExpirado = ! $tokenInvalido && Carbon::parse($record->created_at)
-            ->addMinutes($this->minutosExpiracionToken())
-            ->isPast();
+        $tokenExpirado =
+            ! $tokenInvalido &&
+            Carbon::parse($record->created_at)
+                ->addMinutes($this->minutosExpiracionToken())
+                ->isPast();
 
         if ($tokenInvalido || $tokenExpirado) {
             // Un token caducado se descarta para que no quede en la tabla.
@@ -194,7 +245,9 @@ class AuthController extends Controller
             }
 
             throw ValidationException::withMessages([
-                'email' => ['El token de restablecimiento es inválido o ha expirado.'],
+                'email' => [
+                    'El token de restablecimiento es inválido o ha expirado.',
+                ],
             ]);
         }
 

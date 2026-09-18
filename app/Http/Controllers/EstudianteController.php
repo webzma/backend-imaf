@@ -25,8 +25,11 @@ class EstudianteController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('nombre', 'like', "%{$search}%")
-                    ->orWhere('cedula', 'like', "%{$search}%");
+                $q->where('nombre', 'like', "%{$search}%")->orWhere(
+                    'cedula',
+                    'like',
+                    "%{$search}%",
+                );
             });
         }
 
@@ -42,29 +45,70 @@ class EstudianteController extends Controller
             $query->where('estado_pago', $request->estado_pago);
         }
 
-        return response()->json($query->paginate($this->registrosPorPagina($request)));
+        return response()->json(
+            $query->paginate($this->registrosPorPagina($request)),
+        );
     }
 
     public function store(Request $request)
     {
-        $request->validate([
-            'primer_nombre' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
-            'segundo_nombre' => ['nullable', 'string', 'max:100', self::REGEX_NOMBRES],
-            'primer_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
-            'segundo_apellido' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
-            'email' => 'required|email|unique:users',
-            'password' => 'required|string|min:8',
-            'curso_id' => 'nullable|exists:cursos,id',
-            'nacionalidad' => 'required|in:V,E',
-            'cedula' => ['required', 'string', 'max:15', 'unique:estudiantes,cedula', self::REGEX_CEDULA],
-            'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
-            'municipio' => ['required', 'string', 'max:255'],
-            'direccion' => ['required', 'string', 'max:255', self::REGEX_DIRECCION],
-            'fecha_nacimiento' => 'nullable|date',
-            'genero' => 'nullable|in:masculino,femenino,otro',
-            'fecha_inscripcion' => 'required|date',
-            'estado' => 'in:activo,inactivo,graduado',
-        ], $this->mensajesTipoDato());
+        $request->validate(
+            [
+                'primer_nombre' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'segundo_nombre' => [
+                    'nullable',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'primer_apellido' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'segundo_apellido' => [
+                    'required',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'email' => 'required|email|unique:users',
+                'password' => 'required|string|min:8',
+                'curso_id' => 'nullable|exists:cursos,id',
+                'nacionalidad' => 'required|in:V,E',
+                'cedula' => [
+                    'required',
+                    'string',
+                    'max:15',
+                    'unique:estudiantes,cedula',
+                    self::REGEX_CEDULA,
+                ],
+                'telefono' => [
+                    'nullable',
+                    'string',
+                    'max:20',
+                    self::REGEX_NUMERICO,
+                ],
+                'municipio' => ['required', 'string', 'max:255'],
+                'direccion' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    self::REGEX_DIRECCION,
+                ],
+                'fecha_nacimiento' => 'nullable|date',
+                'genero' => 'nullable|in:masculino,femenino,otro',
+                'fecha_inscripcion' => 'required|date',
+                'estado' => 'in:activo,inactivo,graduado',
+            ],
+            $this->mensajesTipoDato(),
+        );
 
         $estudiante = DB::transaction(function () use ($request) {
             $user = User::create([
@@ -107,14 +151,21 @@ class EstudianteController extends Controller
 
     public function miCurso()
     {
-        $estudiante = Estudiante::with('curso.instructor.user', 'curso.temario', 'curso.sesiones')
+        $estudiante = Estudiante::with(
+            'curso.instructor.user',
+            'curso.temario',
+            'curso.sesiones',
+        )
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
         if (! $estudiante->curso_id || ! $estudiante->curso) {
-            return response()->json([
-                'message' => 'No estás inscrito en ningún curso.',
-            ], 404);
+            return response()->json(
+                [
+                    'message' => 'No estás inscrito en ningún curso.',
+                ],
+                404,
+            );
         }
 
         $curso = $estudiante->curso;
@@ -134,29 +185,35 @@ class EstudianteController extends Controller
                 'limite_cupo' => $curso->limite_cupo,
                 'cupos_restantes' => $curso->cupos_restantes,
                 'whatsapp_url' => $curso->whatsapp_url,
-                'instructor' => $profesor ? [
-                    'id' => $profesor->id,
-                    'nombre' => $profesor->user?->name,
-                    'foto' => $profesor->foto,
-                    'especialidad' => $profesor->especialidad,
-                    'titulo' => $profesor->titulo,
-                    'departamento' => $profesor->departamento,
-                ] : null,
-                'temario' => $curso->temario->map(fn ($t) => [
-                    'id' => $t->id,
-                    'titulo' => $t->titulo,
-                    'descripcion' => $t->descripcion,
-                    'orden' => $t->orden,
-                ]),
-                'sesiones' => $curso->sesiones->map(fn ($s) => [
-                    'id' => $s->id,
-                    'titulo' => $s->titulo,
-                    'descripcion' => $s->descripcion,
-                    'fecha' => $s->fecha,
-                    'hora_inicio' => $s->hora_inicio,
-                    'hora_fin' => $s->hora_fin,
-                    'estado' => $s->estado,
-                ]),
+                'instructor' => $profesor
+                    ? [
+                        'id' => $profesor->id,
+                        'nombre' => $profesor->user?->name,
+                        'foto' => $profesor->foto,
+                        'especialidad' => $profesor->especialidad,
+                        'titulo' => $profesor->titulo,
+                        'departamento' => $profesor->departamento,
+                    ]
+                    : null,
+                'temario' => $curso->temario->map(
+                    fn ($t) => [
+                        'id' => $t->id,
+                        'titulo' => $t->titulo,
+                        'descripcion' => $t->descripcion,
+                        'orden' => $t->orden,
+                    ],
+                ),
+                'sesiones' => $curso->sesiones->map(
+                    fn ($s) => [
+                        'id' => $s->id,
+                        'titulo' => $s->titulo,
+                        'descripcion' => $s->descripcion,
+                        'fecha' => $s->fecha,
+                        'hora_inicio' => $s->hora_inicio,
+                        'hora_fin' => $s->hora_fin,
+                        'estado' => $s->estado,
+                    ],
+                ),
             ],
             'estado_pago' => $estudiante->estado_pago,
             'estado_aprobacion_curso' => $estudiante->estado_aprobacion_curso,
@@ -168,13 +225,21 @@ class EstudianteController extends Controller
         $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
         $id = $estudiante->id;
 
-        $data = $request->validate([
-            'nacionalidad' => ['sometimes', 'in:V,E'],
-            'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
-            'municipio' => 'nullable|string|max:255',
-            'fecha_nacimiento' => 'nullable|date',
-            'genero' => 'nullable|in:masculino,femenino,otro',
-        ], $this->mensajesTipoDato());
+        $data = $request->validate(
+            [
+                'nacionalidad' => ['sometimes', 'in:V,E'],
+                'telefono' => [
+                    'nullable',
+                    'string',
+                    'max:20',
+                    self::REGEX_NUMERICO,
+                ],
+                'municipio' => 'nullable|string|max:255',
+                'fecha_nacimiento' => 'nullable|date',
+                'genero' => 'nullable|in:masculino,femenino,otro',
+            ],
+            $this->mensajesTipoDato(),
+        );
 
         $estudiante->update($data);
         $estudiante->refresh();
@@ -204,14 +269,19 @@ class EstudianteController extends Controller
                         'crop' => 'fill',
                         'gravity' => 'face',
                     ],
-                ]
+                ],
             );
         } catch (\Throwable $e) {
-            \Log::error('Error subiendo foto de estudiante: '.$e->getMessage());
+            \Log::error(
+                'Error subiendo foto de estudiante: '.$e->getMessage(),
+            );
 
-            return response()->json([
-                'message' => 'No se pudo subir la imagen. Inténtalo de nuevo.',
-            ], 500);
+            return response()->json(
+                [
+                    'message' => 'No se pudo subir la imagen. Inténtalo de nuevo.',
+                ],
+                500,
+            );
         }
 
         $estudiante->update(['foto' => $upload['secure_url']]);
@@ -248,7 +318,7 @@ class EstudianteController extends Controller
 
         $query->whereHas(
             'curso.instructor',
-            fn (Builder $q) => $q->where('user_id', $usuario->id)
+            fn (Builder $q) => $q->where('user_id', $usuario->id),
         );
     }
 
@@ -256,29 +326,79 @@ class EstudianteController extends Controller
     {
         $estudiante = Estudiante::findOrFail($id);
 
-        $data = $request->validate([
-            'curso_id' => 'nullable|exists:cursos,id',
-            'nombre' => ['sometimes', 'string', 'max:255', self::REGEX_ALFABETICO],
-            'primer_nombre' => ['sometimes', 'string', 'max:100', self::REGEX_NOMBRES],
-            'segundo_nombre' => ['nullable', 'string', 'max:100', self::REGEX_NOMBRES],
-            'primer_apellido' => ['sometimes', 'string', 'max:100', self::REGEX_NOMBRES],
-            'segundo_apellido' => ['sometimes', 'string', 'max:100', self::REGEX_NOMBRES],
-            'nacionalidad' => ['sometimes', 'in:V,E'],
-            'cedula' => ['sometimes', 'string', 'max:15', 'unique:estudiantes,cedula,'.$id, self::REGEX_CEDULA],
-            'telefono' => ['nullable', 'string', 'max:20', self::REGEX_NUMERICO],
-            'municipio' => ['required', 'string', 'max:255'],
-            'direccion' => ['required', 'string', 'max:255', self::REGEX_DIRECCION],
-            'fecha_nacimiento' => 'nullable|date',
-            'genero' => 'nullable|in:masculino,femenino,otro',
-            'fecha_inscripcion' => 'sometimes|date',
-            'estado' => 'in:activo,inactivo,graduado',
-        ], $this->mensajesTipoDato());
+        $data = $request->validate(
+            [
+                'curso_id' => 'nullable|exists:cursos,id',
+                'nombre' => [
+                    'sometimes',
+                    'string',
+                    'max:255',
+                    self::REGEX_ALFABETICO,
+                ],
+                'primer_nombre' => [
+                    'sometimes',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'segundo_nombre' => [
+                    'nullable',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'primer_apellido' => [
+                    'sometimes',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'segundo_apellido' => [
+                    'sometimes',
+                    'string',
+                    'max:100',
+                    self::REGEX_NOMBRES,
+                ],
+                'nacionalidad' => ['sometimes', 'in:V,E'],
+                'cedula' => [
+                    'sometimes',
+                    'string',
+                    'max:15',
+                    'unique:estudiantes,cedula,'.$id,
+                    self::REGEX_CEDULA,
+                ],
+                'telefono' => [
+                    'nullable',
+                    'string',
+                    'max:20',
+                    self::REGEX_NUMERICO,
+                ],
+                'municipio' => ['required', 'string', 'max:255'],
+                'direccion' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    self::REGEX_DIRECCION,
+                ],
+                'fecha_nacimiento' => 'nullable|date',
+                'genero' => 'nullable|in:masculino,femenino,otro',
+                'fecha_inscripcion' => 'sometimes|date',
+                'estado' => 'in:activo,inactivo,graduado',
+            ],
+            $this->mensajesTipoDato(),
+        );
 
         $estudiante->load('user');
 
-        $camposUsuario = array_intersect_key($data, array_flip([
-            'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido',
-        ]));
+        $camposUsuario = array_intersect_key(
+            $data,
+            array_flip([
+                'primer_nombre',
+                'segundo_nombre',
+                'primer_apellido',
+                'segundo_apellido',
+            ]),
+        );
 
         if (! empty($camposUsuario) && $estudiante->user) {
             $estudiante->user->update($camposUsuario);
@@ -286,9 +406,17 @@ class EstudianteController extends Controller
             $data['nombre'] = $estudiante->user->name;
         }
 
-        $estudiante->update(array_diff_key($data, array_flip([
-            'primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido',
-        ])));
+        $estudiante->update(
+            array_diff_key(
+                $data,
+                array_flip([
+                    'primer_nombre',
+                    'segundo_nombre',
+                    'primer_apellido',
+                    'segundo_apellido',
+                ]),
+            ),
+        );
 
         return response()->json($estudiante->load('user', 'curso'));
     }
@@ -297,7 +425,9 @@ class EstudianteController extends Controller
     {
         Estudiante::findOrFail($id)->delete();
 
-        return response()->json(['message' => 'Estudiante eliminado correctamente.']);
+        return response()->json([
+            'message' => 'Estudiante eliminado correctamente.',
+        ]);
     }
 
     /**
@@ -313,8 +443,14 @@ class EstudianteController extends Controller
 
         $estudiante->update($data);
 
-        if ($estudiante->wasChanged('estado_pago') && in_array($estudiante->estado_pago, ['aprobado', 'reprobado'], true)) {
-            $this->notifySolicitudCursoSiHayCurso($estudiante, SolicitudCursoProcesada::TIPO_APROBACION_PAGO);
+        if (
+            $estudiante->wasChanged('estado_pago') &&
+            in_array($estudiante->estado_pago, ['aprobado', 'reprobado'], true)
+        ) {
+            $this->notifySolicitudCursoSiHayCurso(
+                $estudiante,
+                SolicitudCursoProcesada::TIPO_APROBACION_PAGO,
+            );
         }
 
         return response()->json($estudiante->load('user', 'curso'));
@@ -325,11 +461,20 @@ class EstudianteController extends Controller
      */
     public function updateAprobacionCurso(Request $request, string $id)
     {
-        $estudiante = Estudiante::with('user', 'curso.instructor')->findOrFail($id);
+        $estudiante = Estudiante::with('user', 'curso.instructor')->findOrFail(
+            $id,
+        );
 
         $curso = $estudiante->curso;
-        if (! $curso || ! $curso->instructor || (int) $curso->instructor->user_id !== (int) Auth::id()) {
-            return response()->json(['message' => 'No autorizado para este curso.'], 403);
+        if (
+            ! $curso ||
+            ! $curso->instructor ||
+            (int) $curso->instructor->user_id !== (int) Auth::id()
+        ) {
+            return response()->json(
+                ['message' => 'No autorizado para este curso.'],
+                403,
+            );
         }
 
         $data = $request->validate([
@@ -350,24 +495,42 @@ class EstudianteController extends Controller
             $faltas = $sesionesRealizadas->count() - $presentes;
 
             if ($faltas > 0) {
-                return response()->json([
-                    'message' => "No se puede aprobar: el estudiante no cumplió con toda la asistencia (faltó a {$faltas} de {$sesionesRealizadas->count()} ".
-                        ($sesionesRealizadas->count() === 1 ? 'sesión realizada' : 'sesiones realizadas').').',
-                ], 422);
+                return response()->json(
+                    [
+                        'message' => "No se puede aprobar: el estudiante no cumplió con toda la asistencia (faltó a {$faltas} de {$sesionesRealizadas->count()} ".
+                            ($sesionesRealizadas->count() === 1
+                                ? 'sesión realizada'
+                                : 'sesiones realizadas').
+                            ').',
+                    ],
+                    422,
+                );
             }
         }
 
         $estudiante->update($data);
 
-        if ($estudiante->wasChanged('estado_aprobacion_curso') && in_array($estudiante->estado_aprobacion_curso, ['aprobado', 'reprobado'], true)) {
-            $this->notifySolicitudCursoSiHayCurso($estudiante, SolicitudCursoProcesada::TIPO_APROBACION_CURSO);
+        if (
+            $estudiante->wasChanged('estado_aprobacion_curso') &&
+            in_array(
+                $estudiante->estado_aprobacion_curso,
+                ['aprobado', 'reprobado'],
+                true,
+            )
+        ) {
+            $this->notifySolicitudCursoSiHayCurso(
+                $estudiante,
+                SolicitudCursoProcesada::TIPO_APROBACION_CURSO,
+            );
         }
 
         return response()->json($estudiante->load('user', 'curso'));
     }
 
-    private function notifySolicitudCursoSiHayCurso(Estudiante $estudiante, string $tipo): void
-    {
+    private function notifySolicitudCursoSiHayCurso(
+        Estudiante $estudiante,
+        string $tipo,
+    ): void {
         $curso = $estudiante->curso;
         if (! $curso || ! $estudiante->user) {
             return;
@@ -383,11 +546,13 @@ class EstudianteController extends Controller
             return;
         }
 
-        $estudiante->user->notify(new SolicitudCursoProcesada(
-            nombreCurso: $curso->nombre,
-            estado: $estadoNotif,
-            cursoId: (int) $curso->id,
-            tipo: $tipo,
-        ));
+        $estudiante->user->notify(
+            new SolicitudCursoProcesada(
+                nombreCurso: $curso->nombre,
+                estado: $estadoNotif,
+                cursoId: (int) $curso->id,
+                tipo: $tipo,
+            ),
+        );
     }
 }
