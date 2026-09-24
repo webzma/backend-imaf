@@ -203,7 +203,7 @@
             <div class="nombre">{{ $estudiante->nombre }}</div>
 
             <div class="texto">
-                ha completado satisfactoriamente el curso
+                ha completado satisfactoriamente, en modalidad presencial, el curso
             </div>
 
             <div class="curso-nombre">{{ $curso->nombre }}</div>

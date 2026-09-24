@@ -112,6 +112,29 @@ class CursoTest extends TestCase
         ]))->assertStatus(422)->assertJsonValidationErrors('fecha_fin');
     }
 
+    public function test_editar_curso_falla_si_la_nueva_fecha_es_feriado(): void
+    {
+        $this->actingAsAdmin();
+        $curso = Curso::factory()->create(['fecha_inicio' => '2026-09-01']);
+
+        // 2026-10-12 es feriado (Día de la Resistencia Indígena)
+        $this->putJson("/api/admin/cursos/{$curso->id}", [
+            'fecha_inicio' => '2026-10-12',
+        ])->assertStatus(422)->assertJsonValidationErrors('fecha_inicio');
+    }
+
+    public function test_editar_curso_conserva_una_fecha_antigua_no_habil(): void
+    {
+        $this->actingAsAdmin();
+        // Creado antes de la regla, empezando un sábado.
+        $curso = Curso::factory()->create(['fecha_inicio' => '2026-09-05']);
+
+        $this->putJson("/api/admin/cursos/{$curso->id}", [
+            'fecha_inicio' => '2026-09-05',
+            'nombre' => 'Nombre nuevo',
+        ])->assertOk();
+    }
+
     public function test_crear_curso_falla_si_fecha_inicio_es_feriado_fijo(): void
     {
         $this->actingAsAdmin();

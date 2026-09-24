@@ -94,6 +94,14 @@ Route::middleware('auth:sanctum')->group(function () {
             // Cursos (antes de las rutas genéricas {slug} para evitar conflicto)
             Route::get('cursos/resumen', [CursoController::class, 'resumen']);
             Route::apiResource('cursos', CursoController::class);
+            Route::post('cursos/{id}/estudiantes', [
+                CursoController::class,
+                'inscribirEstudiante',
+            ]);
+            Route::delete('cursos/{id}/estudiantes/{estudianteId}', [
+                CursoController::class,
+                'quitarEstudiante',
+            ]);
 
             // Temario y sesiones de cursos
             Route::get('cursos/{cursoId}/temario', [
@@ -254,6 +262,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('cursos', [CursoController::class, 'indexActivos']);
             Route::get('cursos/{id}', [CursoController::class, 'show']);
             Route::get('curso', [EstudianteController::class, 'miCurso']);
+            Route::get('mis-cursos', [EstudianteController::class, 'misCursos']);
             Route::get('certificado', [
                 CertificadoController::class,
                 'downloadMe',

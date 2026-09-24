@@ -23,6 +23,20 @@ class CatalogoController extends Controller
     ];
 
     /**
+     * Nombres de catálogo: letras, números, espacios y . - ' ( ). Antes solo
+     * letras y el mensaje decía "letras, espacios y guiones", así que
+     * "T.S.U. en Informática" pasaba pero "Contrato 2026" no, sin explicación.
+     */
+    private const REGEX_NOMBRE = 'regex:/^[\pL\pM\d\s\'\-\.\(\)]+$/u';
+
+    private const MENSAJES = [
+        'nombre.required' => 'El nombre es obligatorio.',
+        'nombre.unique' => 'Ya existe un registro con ese nombre.',
+        'nombre.regex' => "El nombre solo puede contener letras, números, espacios y los signos . - ' ( ).",
+        'nombre.max' => 'El nombre no puede superar los 255 caracteres.',
+    ];
+
+    /**
      * Retorna el modelo Eloquent para el slug dado.
      */
     private function modelo(string $slug): Model
@@ -43,7 +57,9 @@ class CatalogoController extends Controller
     {
         $modelo = $this->modelo($slug);
 
-        return response()->json($modelo::orderBy('nombre')->get());
+        // `profesores_count`: la pantalla avisa cuántos instructores lo usan
+        // antes de borrarlo (al borrar, el campo les queda vacío).
+        return response()->json($modelo::withCount('profesores')->orderBy('nombre')->get());
     }
 
     /**
@@ -53,13 +69,11 @@ class CatalogoController extends Controller
     {
         $modelo = $this->modelo($slug);
 
+        $request->merge(['nombre' => trim((string) $request->input('nombre'))]);
+
         $data = $request->validate([
-            'nombre' => ['required', 'string', 'max:255', 'unique:'.$modelo->getTable().',nombre', self::REGEX_ALFABETICO],
-        ], [
-            'nombre.required' => 'El nombre es obligatorio.',
-            'nombre.unique' => 'Ya existe un registro con ese nombre.',
-            'nombre.regex' => 'El nombre solo puede contener letras, espacios y guiones.',
-        ]);
+            'nombre' => ['required', 'string', 'max:255', 'unique:'.$modelo->getTable().',nombre', self::REGEX_NOMBRE],
+        ], self::MENSAJES);
 
         $registro = $modelo->create($data);
 
@@ -74,13 +88,11 @@ class CatalogoController extends Controller
         $modelo = $this->modelo($slug);
         $registro = $modelo->findOrFail($id);
 
+        $request->merge(['nombre' => trim((string) $request->input('nombre'))]);
+
         $data = $request->validate([
-            'nombre' => ['required', 'string', 'max:255', 'unique:'.$modelo->getTable().',nombre,'.$id, self::REGEX_ALFABETICO],
-        ], [
-            'nombre.required' => 'El nombre es obligatorio.',
-            'nombre.unique' => 'Ya existe un registro con ese nombre.',
-            'nombre.regex' => 'El nombre solo puede contener letras, espacios y guiones.',
-        ]);
+            'nombre' => ['required', 'string', 'max:255', 'unique:'.$modelo->getTable().',nombre,'.$id, self::REGEX_NOMBRE],
+        ], self::MENSAJES);
 
         $registro->update($data);
 

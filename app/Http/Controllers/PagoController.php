@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Curso;
 use App\Models\Estudiante;
+use App\Models\Inscripcion;
 use App\Models\Pago;
 use App\Models\Profesor;
 use App\Models\User;
@@ -95,8 +96,25 @@ class PagoController extends Controller
             'estado' => 'pendiente',
         ]);
 
-        // El estudiante queda pendiente por pago hasta que el admin verifique
-        Estudiante::where('user_id', $user->id)->update(['estado_pago' => 'pendiente']);
+        // Sin curso actual, el estudiante queda pendiente por pago hasta que el
+        // admin verifique. Si ya cursa otro, su acceso a ese curso no cambia.
+        Estudiante::where('user_id', $user->id)
+            ->whereNull('curso_id')
+            ->update(['estado_pago' => 'pendiente']);
+
+        // Figura en el listado interno del curso desde que solicita, con el
+        // pago pendiente; no ocupa cupo hasta que se apruebe.
+        if ($estudiante = Estudiante::where('user_id', $user->id)->first()) {
+            $inscripcion = Inscripcion::firstOrNew([
+                'estudiante_id' => $estudiante->id,
+                'curso_id' => $curso->id,
+            ]);
+            if ($inscripcion->estado_pago !== 'aprobado') {
+                $inscripcion->estado_pago = 'pendiente';
+                $inscripcion->fecha_inscripcion ??= now()->toDateString();
+                $inscripcion->save();
+            }
+        }
 
         $metodoLabel = [
             'transferencia' => 'transferencia',
@@ -264,9 +282,11 @@ class PagoController extends Controller
             // Bloquear el curso para evitar aprobaciones simultáneas que excedan el cupo
             $curso = Curso::lockForUpdate()->findOrFail($pago->curso_id);
 
+            $estudiante = Estudiante::where('user_id', $pago->user_id)->first();
+
             if ($estado === 'aprobado') {
-                $ocupados = Estudiante::where('curso_id', $curso->id)->count();
-                if ($ocupados >= $curso->limite_cupo) {
+                $yaInscrito = $estudiante && $curso->estudiantes()->whereKey($estudiante->id)->exists();
+                if (! $yaInscrito && $curso->estudiantes()->count() >= $curso->limite_cupo) {
                     $cupoAgotado = true;
 
                     return;
@@ -278,19 +298,23 @@ class PagoController extends Controller
                 'nota_admin' => $nota,
             ]);
 
-            $estudiante = Estudiante::where('user_id', $pago->user_id)->first();
-
             if ($estudiante) {
                 if ($estado === 'aprobado') {
+                    // El curso pagado pasa a ser el actual; el anterior queda
+                    // en `inscripciones` (ver Estudiante::booted).
                     $estudiante->update([
                         'curso_id' => $pago->curso_id,
                         'estado_pago' => 'aprobado',
                         'estado' => 'activo',
                     ]);
-                } elseif ($estado === 'rechazado') {
-                    $estudiante->update([
-                        'estado_pago' => 'reprobado',
-                    ]);
+                    // Si ya era su curso actual, el observer no toca la
+                    // inscripción: se marca aquí.
+                    Inscripcion::updateOrCreate(
+                        ['estudiante_id' => $estudiante->id, 'curso_id' => $pago->curso_id],
+                        ['estado_pago' => 'aprobado'],
+                    );
+                } else {
+                    $this->rechazarInscripcion($estudiante, $pago);
                 }
             }
         });
@@ -303,6 +327,8 @@ class PagoController extends Controller
         }
 
         $pago->refresh();
+
+        $this->notificarEstudiante($pago, $estado, $nota);
 
         // Si el pago fue aprobado, notificar al profesor del curso
         if ($estado === 'aprobado') {
@@ -321,6 +347,75 @@ class PagoController extends Controller
         }
 
         return ['ok' => true, 'message' => "Pago {$estado} con éxito."];
+    }
+
+    /**
+     * Con el pago rechazado el estudiante deja de estar inscrito en ese curso,
+     * aunque antes se hubiera aprobado o el admin lo hubiera asignado a mano.
+     * La inscripción se conserva marcada como `reprobado` para que siga en el
+     * listado interno del curso, pero ya no ocupa cupo ni la ve el estudiante.
+     * Si era su curso actual, vuelve al último curso pagado que le quede.
+     */
+    private function rechazarInscripcion(Estudiante $estudiante, Pago $pago): void
+    {
+        $otroPagoAprobado = Pago::where('user_id', $pago->user_id)
+            ->where('curso_id', $pago->curso_id)
+            ->where('estado', 'aprobado')
+            ->whereKeyNot($pago->id)
+            ->exists();
+
+        if ($otroPagoAprobado) {
+            return;
+        }
+
+        $inscripcion = Inscripcion::firstOrNew([
+            'estudiante_id' => $estudiante->id,
+            'curso_id' => $pago->curso_id,
+        ]);
+        $inscripcion->estado_pago = 'reprobado';
+        $inscripcion->fecha_inscripcion ??= now()->toDateString();
+        $inscripcion->save();
+
+        $eraActual = (int) $estudiante->curso_id === (int) $pago->curso_id;
+        if (! $eraActual && $estudiante->curso_id) {
+            return;
+        }
+
+        $anterior = $eraActual
+            ? $estudiante->inscripciones()
+                ->where('estado_pago', 'aprobado')
+                ->orderByDesc('fecha_inscripcion')
+                ->orderByDesc('id')
+                ->first()
+            : null;
+
+        $estudiante->update([
+            'curso_id' => $anterior?->curso_id,
+            'estado_pago' => $anterior ? 'aprobado' : 'reprobado',
+        ]);
+    }
+
+    /** Avisa al estudiante de la decisión sobre su pago. */
+    private function notificarEstudiante(Pago $pago, string $estado, ?string $nota): void
+    {
+        $nombreCurso = $pago->curso->nombre ?? 'el curso';
+
+        if ($estado === 'aprobado') {
+            $pago->user?->notify(new GenericNotification(
+                '¡Pago Aprobado!',
+                "Tu pago para el curso {$nombreCurso} ha sido aprobado. Ya estás inscrito en el curso.",
+                "/estudiante/curso?id={$pago->curso_id}"
+            ));
+
+            return;
+        }
+
+        $motivo = filled($nota) ? " Motivo: {$nota}" : '';
+        $pago->user?->notify(new GenericNotification(
+            'Pago Rechazado',
+            "Tu pago para el curso {$nombreCurso} ha sido rechazado.{$motivo}",
+            '/estudiante/cursos'
+        ));
     }
 
     // Admin: eliminar pago (y su comprobante)

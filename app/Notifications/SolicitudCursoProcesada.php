@@ -55,8 +55,8 @@ class SolicitudCursoProcesada extends Notification
         $mensaje = sprintf('%s Curso: %s.', $mensajeBase, $this->nombreCurso);
 
         $url = match ($this->tipo) {
-            self::TIPO_APROBACION_PAGO => '/estudiante/curso',
-            self::TIPO_APROBACION_CURSO => '/estudiante/perfil',
+            self::TIPO_APROBACION_PAGO,
+            self::TIPO_APROBACION_CURSO => "/estudiante/curso?id={$this->cursoId}",
             default => '/estudiante/notificaciones',
         };
 

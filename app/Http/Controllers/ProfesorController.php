@@ -83,24 +83,30 @@ class ProfesorController extends Controller
         ]);
     }
 
+    /*
+     * Estas rutas explícitas atienden el GET de la pantalla de Catálogos (van
+     * antes del `{slug}` de CatalogoController). `profesores_count` permite
+     * avisar cuántos instructores usan cada opción antes de borrarla.
+     */
+
     public function getTipoContratos()
     {
-        return response()->json(TipoContrato::all());
+        return response()->json(TipoContrato::withCount('profesores')->orderBy('nombre')->get());
     }
 
     public function getEspecialidades()
     {
-        return response()->json(Especialidad::orderBy('nombre')->get());
+        return response()->json(Especialidad::withCount('profesores')->orderBy('nombre')->get());
     }
 
     public function getDepartamentos()
     {
-        return response()->json(Departamento::orderBy('nombre')->get());
+        return response()->json(Departamento::withCount('profesores')->orderBy('nombre')->get());
     }
 
     public function getTitulos()
     {
-        return response()->json(Titulo::orderBy('nombre')->get());
+        return response()->json(Titulo::withCount('profesores')->orderBy('nombre')->get());
     }
 
     public function store(Request $request)

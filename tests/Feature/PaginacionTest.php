@@ -251,7 +251,7 @@ class PaginacionTest extends TestCase
 
         $item = $response->json('data.0');
         $this->assertSame(
-            ['id', 'nombre', 'codigo', 'descripcion', 'estado', 'limite_cupo', 'cupos_restantes', 'fecha_inicio', 'fecha_fin'],
+            ['id', 'nombre', 'codigo', 'descripcion', 'estado', 'modalidad', 'limite_cupo', 'cupos_restantes', 'fecha_inicio', 'fecha_fin'],
             array_keys($item)
         );
         $this->assertSame('2026-09-07', $item['fecha_inicio']);

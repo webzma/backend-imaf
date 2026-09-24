@@ -20,6 +20,7 @@ class CursoResumenResource extends JsonResource
             'codigo' => $this->codigo,
             'descripcion' => $this->descripcion,
             'estado' => $this->estado,
+            'modalidad' => $this->modalidad,
             'limite_cupo' => $this->limite_cupo,
             'cupos_restantes' => $this->cupos_restantes,
             'fecha_inicio' => $this->fecha_inicio?->toDateString(),

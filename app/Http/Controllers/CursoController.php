@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Resources\CursoResumenResource;
 use App\Models\Curso;
 use App\Models\Estudiante;
+use App\Models\Inscripcion;
 use App\Models\Profesor;
 use App\Notifications\GenericNotification;
 use App\Rules\DiaHabil;
 use App\Services\CursoEstadoService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class CursoController extends Controller
@@ -60,7 +62,7 @@ class CursoController extends Controller
             'total' => Curso::count(),
             'activos' => Curso::where('estado', 'activo')->count(),
             'inactivos' => Curso::where('estado', 'inactivo')->count(),
-            'estudiantes' => Estudiante::whereNotNull('curso_id')->count(),
+            'estudiantes' => Estudiante::has('cursos')->count(),
             'con_estudiantes' => Curso::has('estudiantes')->count(),
         ]);
     }
@@ -125,11 +127,99 @@ class CursoController extends Controller
         return response()->json($curso->load('instructor'), 201);
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
-        $curso = Curso::with('instructor.user', 'estudiantes.user', 'temario', 'sesiones')->findOrFail($id);
+        $curso = Curso::with('instructor.user', 'temario', 'sesiones')->findOrFail($id);
+
+        // Admin e instructor ven el listado interno completo: también a
+        // quien no ha pagado, está inactivo o fue archivado. El estudiante
+        // (catálogo) solo ve a los inscritos con el pago aprobado.
+        $interno = $request->user()?->isAdmin() || $request->user()?->isProfesor();
+
+        $estudiantes = $interno
+            ? $curso->matriculas()->withTrashed()->with('user')->get()
+            : $curso->estudiantes()->with('user')->get();
+
+        // Los campos del estudiante describen su curso actual; en la lista
+        // de este curso deben verse los de este curso.
+        $estudiantes->each(fn ($e) => $e->forceFill([
+            'estado_pago' => $e->pivot->estado_pago,
+            'estado_aprobacion_curso' => $e->pivot->estado_aprobacion_curso,
+            'fecha_inscripcion' => $e->pivot->fecha_inscripcion ?? $e->fecha_inscripcion,
+        ]));
+
+        $curso->setRelation('estudiantes', $estudiantes);
 
         return response()->json($curso);
+    }
+
+    /**
+     * Admin: inscribe a un estudiante en el curso (queda con el pago
+     * aprobado y el curso pasa a ser el actual). También sirve para dar por
+     * pagada una inscripción pendiente o rechazada.
+     */
+    public function inscribirEstudiante(Request $request, string $id)
+    {
+        $data = $request->validate([
+            'estudiante_id' => 'required|integer|exists:estudiantes,id',
+        ]);
+
+        return DB::transaction(function () use ($id, $data) {
+            $curso = Curso::lockForUpdate()->findOrFail($id);
+            $estudiante = Estudiante::findOrFail($data['estudiante_id']);
+
+            $yaInscrito = $curso->estudiantes()->whereKey($estudiante->id)->exists();
+            if (! $yaInscrito && $curso->estudiantes()->count() >= $curso->limite_cupo) {
+                return response()->json([
+                    'message' => 'El curso ya no tiene cupos disponibles.',
+                ], 422);
+            }
+
+            $estudiante->update(['curso_id' => $curso->id, 'estado_pago' => 'aprobado']);
+            Inscripcion::where('estudiante_id', $estudiante->id)
+                ->where('curso_id', $curso->id)
+                ->update(['estado_pago' => 'aprobado']);
+
+            return response()->json($this->estudianteEnCurso($curso, $estudiante->id), 201);
+        });
+    }
+
+    /**
+     * Admin: quita al estudiante del curso (borra la inscripción). Si era su
+     * curso actual, vuelve al último curso pagado que le quede.
+     */
+    public function quitarEstudiante(string $id, string $estudianteId)
+    {
+        $curso = Curso::findOrFail($id);
+        $estudiante = Estudiante::withTrashed()->findOrFail($estudianteId);
+
+        Inscripcion::where('estudiante_id', $estudiante->id)
+            ->where('curso_id', $curso->id)
+            ->delete();
+
+        if ((int) $estudiante->curso_id === (int) $curso->id) {
+            $anterior = $estudiante->inscripciones()
+                ->where('estado_pago', 'aprobado')
+                ->orderByDesc('fecha_inscripcion')
+                ->orderByDesc('id')
+                ->first();
+
+            $estudiante->update(['curso_id' => $anterior?->curso_id]);
+        }
+
+        return response()->json(['message' => 'Estudiante quitado del curso.']);
+    }
+
+    /** Un estudiante tal como aparece en el listado interno del curso. */
+    private function estudianteEnCurso(Curso $curso, int $estudianteId): Estudiante
+    {
+        $e = $curso->matriculas()->withTrashed()->with('user')->whereKey($estudianteId)->firstOrFail();
+
+        return $e->forceFill([
+            'estado_pago' => $e->pivot->estado_pago,
+            'estado_aprobacion_curso' => $e->pivot->estado_aprobacion_curso,
+            'fecha_inscripcion' => $e->pivot->fecha_inscripcion ?? $e->fecha_inscripcion,
+        ]);
     }
 
     public function update(Request $request, string $id)
@@ -141,8 +231,16 @@ class CursoController extends Controller
             'nombre' => 'sometimes|string|max:255',
             'limite_cupo' => 'sometimes|integer|min:1',
             'minimo_estudiantes' => 'nullable|integer|min:1',
-            'fecha_inicio' => 'nullable|date',
-            'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
+            // Solo se exige día hábil a la fecha que cambia: un curso creado
+            // antes de la regla debe poder editarse sin tocar sus fechas.
+            'fecha_inicio' => ['nullable', 'date', Rule::when(
+                $request->input('fecha_inicio') !== $curso->fecha_inicio?->toDateString(),
+                [new DiaHabil()],
+            )],
+            'fecha_fin' => ['nullable', 'date', 'after_or_equal:fecha_inicio', Rule::when(
+                $request->input('fecha_fin') !== $curso->fecha_fin?->toDateString(),
+                [new DiaHabil()],
+            )],
             'descripcion' => 'nullable|string',
             'requisitos' => 'nullable|string',
             'precio' => 'sometimes|numeric|min:0',

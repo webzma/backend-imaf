@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Asistencia;
 use App\Models\Estudiante;
+use App\Models\Inscripcion;
+use App\Models\Pago;
 use App\Models\Sesion;
 use App\Models\User;
 use App\Notifications\SolicitudCursoProcesada;
@@ -52,7 +54,7 @@ class EstudianteController extends Controller
         if ($request->filled('curso_id')) {
             $request->curso_id === 'sin_curso'
                 ? $query->whereNull('curso_id')
-                : $query->where('curso_id', $request->curso_id);
+                : $query->whereHas('cursos', fn ($c) => $c->whereKey($request->curso_id));
         }
 
         if ($request->filled('municipio')) {
@@ -85,7 +87,7 @@ class EstudianteController extends Controller
         $this->acotarAlProfesor($query, $request->user());
 
         if ($request->filled('curso_id') && $request->curso_id !== 'sin_curso') {
-            $query->where('curso_id', $request->curso_id);
+            $query->whereHas('cursos', fn ($c) => $c->whereKey($request->curso_id));
         }
 
         return response()->json([
@@ -216,17 +218,26 @@ class EstudianteController extends Controller
         return response()->json($estudiante);
     }
 
-    public function miCurso()
+    /**
+     * Detalle del curso actual o, con `?curso_id=`, de cualquier curso en el
+     * que el estudiante esté o haya estado inscrito.
+     */
+    public function miCurso(Request $request)
     {
-        $estudiante = Estudiante::with(
-            'curso.instructor.user',
-            'curso.temario',
-            'curso.sesiones',
-        )
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
 
-        if (! $estudiante->curso_id || ! $estudiante->curso) {
+        $cursoId = $request->filled('curso_id')
+            ? (int) $request->curso_id
+            : $estudiante->curso_id;
+
+        $curso = $cursoId
+            ? $estudiante->cursos()
+                ->with('instructor.user', 'temario', 'sesiones')
+                ->whereKey($cursoId)
+                ->first()
+            : null;
+
+        if (! $curso) {
             return response()->json(
                 [
                     'message' => 'No estás inscrito en ningún curso.',
@@ -235,7 +246,7 @@ class EstudianteController extends Controller
             );
         }
 
-        $curso = $estudiante->curso;
+        $esActual = (int) $curso->id === (int) $estudiante->curso_id;
         $profesor = $curso->instructor;
 
         return response()->json([
@@ -249,6 +260,8 @@ class EstudianteController extends Controller
                 'fecha_inicio' => $curso->fecha_inicio,
                 'fecha_fin' => $curso->fecha_fin,
                 'estado' => $curso->estado,
+                'modalidad' => $curso->modalidad,
+                'sede' => $curso->sede,
                 'limite_cupo' => $curso->limite_cupo,
                 'cupos_restantes' => $curso->cupos_restantes,
                 'whatsapp_url' => $curso->whatsapp_url,
@@ -282,8 +295,58 @@ class EstudianteController extends Controller
                     ],
                 ),
             ],
-            'estado_pago' => $estudiante->estado_pago,
-            'estado_aprobacion_curso' => $estudiante->estado_aprobacion_curso,
+            // Solo el curso actual puede tener el pago en revisión; los
+            // anteriores quedaron inscritos con el pago aprobado.
+            'estado_pago' => $esActual ? $estudiante->estado_pago : 'aprobado',
+            'estado_aprobacion_curso' => $curso->pivot->estado_aprobacion_curso,
+            'es_actual' => $esActual,
+        ]);
+    }
+
+    /**
+     * Todos los cursos del estudiante (actual y anteriores) y las solicitudes
+     * de inscripción que siguen esperando la revisión del pago.
+     */
+    public function misCursos()
+    {
+        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+
+        $cursos = $estudiante->cursos()
+            ->with('instructor.user')
+            ->orderByPivot('fecha_inscripcion', 'desc')
+            ->orderByPivot('id', 'desc')
+            ->get()
+            ->map(fn ($curso) => [
+                'id' => $curso->id,
+                'codigo' => $curso->codigo,
+                'nombre' => $curso->nombre,
+                'estado' => $curso->estado,
+                'modalidad' => $curso->modalidad,
+                'fecha_inicio' => $curso->fecha_inicio?->toDateString(),
+                'fecha_fin' => $curso->fecha_fin?->toDateString(),
+                'instructor' => $curso->instructor?->user?->name,
+                'fecha_inscripcion' => $curso->pivot->fecha_inscripcion,
+                'estado_aprobacion_curso' => $curso->pivot->estado_aprobacion_curso,
+                'es_actual' => (int) $curso->id === (int) $estudiante->curso_id,
+            ]);
+
+        $pendientes = Pago::with('curso:id,codigo,nombre')
+            ->where('user_id', $estudiante->user_id)
+            ->where('estado', 'pendiente')
+            ->whereNotIn('curso_id', $cursos->pluck('id'))
+            ->latest()
+            ->get()
+            ->map(fn ($pago) => [
+                'pago_id' => $pago->id,
+                'curso_id' => $pago->curso_id,
+                'codigo' => $pago->curso?->codigo,
+                'nombre' => $pago->curso?->nombre,
+                'fecha_solicitud' => $pago->created_at?->toDateString(),
+            ]);
+
+        return response()->json([
+            'cursos' => $cursos,
+            'solicitudes_pendientes' => $pendientes,
         ]);
     }
 
@@ -359,7 +422,7 @@ class EstudianteController extends Controller
 
     public function show(Request $request, string $id)
     {
-        $query = Estudiante::with('user', 'curso');
+        $query = Estudiante::with('user', 'curso', 'cursos.instructor.user');
 
         $this->acotarAlProfesor($query, $request->user());
 
@@ -383,8 +446,10 @@ class EstudianteController extends Controller
             return;
         }
 
+        // Todas sus inscripciones, pagadas o no: el instructor ve en su
+        // listado también a quien no ha pagado.
         $query->whereHas(
-            'curso.instructor',
+            'inscripciones.curso.instructor',
             fn (Builder $q) => $q->where('user_id', $usuario->id),
         );
     }
@@ -528,11 +593,16 @@ class EstudianteController extends Controller
      */
     public function updateAprobacionCurso(Request $request, string $id)
     {
-        $estudiante = Estudiante::with('user', 'curso.instructor')->findOrFail(
-            $id,
-        );
+        $estudiante = Estudiante::with('user')->findOrFail($id);
 
-        $curso = $estudiante->curso;
+        // Sin `curso_id` se asume el curso actual del estudiante.
+        $cursoId = $request->filled('curso_id')
+            ? (int) $request->curso_id
+            : $estudiante->curso_id;
+
+        $curso = $cursoId
+            ? $estudiante->cursos()->with('instructor')->whereKey($cursoId)->first()
+            : null;
         if (
             ! $curso ||
             ! $curso->instructor ||
@@ -575,21 +645,30 @@ class EstudianteController extends Controller
             }
         }
 
-        $estudiante->update($data);
+        $nuevoEstado = $data['estado_aprobacion_curso'];
+        $cambio = $curso->pivot->estado_aprobacion_curso !== $nuevoEstado;
 
-        if (
-            $estudiante->wasChanged('estado_aprobacion_curso') &&
-            in_array(
-                $estudiante->estado_aprobacion_curso,
-                ['aprobado', 'reprobado'],
-                true,
-            )
-        ) {
-            $this->notifySolicitudCursoSiHayCurso(
-                $estudiante,
-                SolicitudCursoProcesada::TIPO_APROBACION_CURSO,
+        Inscripcion::where('estudiante_id', $estudiante->id)
+            ->where('curso_id', $curso->id)
+            ->update(['estado_aprobacion_curso' => $nuevoEstado]);
+
+        if ((int) $curso->id === (int) $estudiante->curso_id) {
+            $estudiante->update($data);
+        }
+
+        if ($cambio && in_array($nuevoEstado, ['aprobado', 'reprobado'], true)) {
+            $estudiante->user?->notify(
+                new SolicitudCursoProcesada(
+                    nombreCurso: $curso->nombre,
+                    estado: $nuevoEstado,
+                    cursoId: (int) $curso->id,
+                    tipo: SolicitudCursoProcesada::TIPO_APROBACION_CURSO,
+                ),
             );
         }
+
+        $estudiante->refresh();
+        $estudiante->setAttribute('estado_aprobacion_curso', $nuevoEstado);
 
         return response()->json($estudiante->load('user', 'curso'));
     }

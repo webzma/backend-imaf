@@ -21,7 +21,7 @@ class AsistenciaController extends Controller
             }
         }
 
-        $estudiantes = Estudiante::where('curso_id', $sesion->curso_id)
+        $estudiantes = Estudiante::whereHas('cursos', fn ($c) => $c->whereKey($sesion->curso_id))
             ->select('id', 'nombre', 'cedula', 'foto')
             ->get();
 
