@@ -126,6 +126,20 @@ class Estudiante extends Model
         ]);
     }
 
+    /**
+     * El curso que el estudiante está cursando ahora: su último curso pagado,
+     * mientras no haya terminado. Uno finalizado sigue en su historial (y con
+     * su certificado), pero ya no es "Mi curso".
+     */
+    public function cursoActual(): ?Curso
+    {
+        $curso = $this->curso_id
+            ? $this->cursos()->whereKey($this->curso_id)->first()
+            : null;
+
+        return $curso?->enCurso() ? $curso : null;
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

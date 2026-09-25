@@ -215,12 +215,8 @@ class EstudianteController extends Controller
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
-        // Defensa: aunque `curso_id` quedara apuntando a un curso sin pago
-        // aprobado (datos antiguos), el estudiante no lo ve como suyo.
-        if (
-            $estudiante->curso_id &&
-            ! $estudiante->cursos()->whereKey($estudiante->curso_id)->exists()
-        ) {
+        // "Mi curso" es solo el que está cursando: pagado y sin terminar.
+        if (! $estudiante->cursoActual()) {
             $estudiante->setRelation('curso', null);
         }
 
@@ -235,9 +231,13 @@ class EstudianteController extends Controller
     {
         $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
 
+        $actual = $estudiante->cursoActual();
+
+        // Sin `curso_id`, el curso que está cursando; un curso ya terminado
+        // se abre con su id desde el historial.
         $cursoId = $request->filled('curso_id')
             ? (int) $request->curso_id
-            : $estudiante->curso_id;
+            : $actual?->id;
 
         $curso = $cursoId
             ? $estudiante->cursos()
@@ -247,15 +247,21 @@ class EstudianteController extends Controller
             : null;
 
         if (! $curso) {
+            // Si su último curso ya terminó, se indica para enlazarlo.
+            $ultimo = ! $request->filled('curso_id') && $estudiante->curso_id
+                ? $estudiante->cursos()->whereKey($estudiante->curso_id)->first(['cursos.id', 'cursos.nombre'])
+                : null;
+
             return response()->json(
                 [
-                    'message' => 'No estás inscrito en ningún curso.',
+                    'message' => 'No estás cursando ningún curso.',
+                    'ultimo_curso' => $ultimo ? ['id' => $ultimo->id, 'nombre' => $ultimo->nombre] : null,
                 ],
                 404,
             );
         }
 
-        $esActual = (int) $curso->id === (int) $estudiante->curso_id;
+        $esActual = (int) $curso->id === (int) $actual?->id;
         $profesor = $curso->instructor;
 
         return response()->json([
@@ -319,6 +325,7 @@ class EstudianteController extends Controller
     public function misCursos()
     {
         $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        $actualId = $estudiante->cursoActual()?->id;
 
         $cursos = $estudiante->cursos()
             ->with('instructor.user')
@@ -336,7 +343,7 @@ class EstudianteController extends Controller
                 'instructor' => $curso->instructor?->user?->name,
                 'fecha_inscripcion' => $curso->pivot->fecha_inscripcion,
                 'estado_aprobacion_curso' => $curso->pivot->estado_aprobacion_curso,
-                'es_actual' => (int) $curso->id === (int) $estudiante->curso_id,
+                'es_actual' => (int) $curso->id === (int) $actualId,
             ]);
 
         $pendientes = Pago::with('curso:id,codigo,nombre')

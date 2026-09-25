@@ -62,6 +62,17 @@ class Curso extends Model
         return max(0, $this->limite_cupo - $ocupados);
     }
 
+    /**
+     * Se está cursando: activo y sin haber llegado a su fecha de fin. El
+     * curso termina el mismo día de su fecha de fin, igual que en
+     * CursoEstadoService y en las tarjetas ("Finalizado").
+     */
+    public function enCurso(): bool
+    {
+        return $this->estado === 'activo'
+            && (! $this->fecha_fin || $this->fecha_fin->isAfter(today()));
+    }
+
     public function getModalidadAttribute(): string
     {
         return self::MODALIDAD;

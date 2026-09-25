@@ -349,6 +349,72 @@ class InscripcionTest extends TestCase
         $this->assertSame('aprobado', $sinPagos->estado_pago);
     }
 
+    public function test_un_curso_terminado_deja_de_ser_mi_curso_pero_sigue_en_el_historial(): void
+    {
+        $this->travelTo('2026-09-24 10:00:00');
+        $curso = Curso::factory()->create([
+            'fecha_inicio' => '2026-08-03',
+            'fecha_fin' => '2026-09-01',
+            'estado' => 'inactivo',
+        ]);
+        $estudiante = Estudiante::factory()->create([
+            'curso_id' => $curso->id,
+            'estado_aprobacion_curso' => 'aprobado',
+        ]);
+
+        Sanctum::actingAs($estudiante->user);
+
+        $this->assertNull($this->getJson('/api/estudiante/perfil')->json('curso'));
+        $this->getJson('/api/estudiante/curso')
+            ->assertNotFound()
+            ->assertJsonPath('ultimo_curso.id', $curso->id);
+
+        // Desde el historial se sigue abriendo, y el certificado se descarga.
+        $this->getJson("/api/estudiante/curso?curso_id={$curso->id}")
+            ->assertOk()
+            ->assertJsonPath('es_actual', false);
+        $this->get("/api/estudiante/certificado?curso_id={$curso->id}")->assertOk();
+
+        $item = collect($this->getJson('/api/estudiante/mis-cursos')->json('cursos'))->firstWhere('id', $curso->id);
+        $this->assertFalse($item['es_actual']);
+    }
+
+    public function test_el_curso_deja_de_ser_actual_el_dia_de_su_fecha_de_fin(): void
+    {
+        $curso = Curso::factory()->create(['fecha_fin' => '2026-09-24', 'estado' => 'activo']);
+        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+
+        $this->travelTo('2026-09-23 18:00:00');
+        $this->assertSame($curso->id, $estudiante->cursoActual()?->id);
+
+        $this->travelTo('2026-09-24 08:00:00');
+        $this->assertNull($estudiante->cursoActual());
+    }
+
+    public function test_un_curso_que_aun_no_empieza_si_es_mi_curso(): void
+    {
+        $this->travelTo('2026-09-24 10:00:00');
+        $curso = Curso::factory()->create([
+            'fecha_inicio' => '2026-10-05',
+            'fecha_fin' => '2026-12-11',
+            'estado' => 'activo',
+        ]);
+        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+
+        Sanctum::actingAs($estudiante->user);
+        $this->assertSame($curso->id, $this->getJson('/api/estudiante/perfil')->json('curso.id'));
+        $this->getJson('/api/estudiante/curso')->assertOk()->assertJsonPath('es_actual', true);
+    }
+
+    public function test_un_curso_inactivo_no_es_mi_curso(): void
+    {
+        $curso = Curso::factory()->create(['estado' => 'inactivo']);
+        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+
+        Sanctum::actingAs($estudiante->user);
+        $this->assertNull($this->getJson('/api/estudiante/perfil')->json('curso'));
+    }
+
     public function test_aprobar_un_segundo_curso_conserva_el_anterior(): void
     {
         $primero = Curso::factory()->create();
