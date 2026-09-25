@@ -41,10 +41,18 @@ class Estudiante extends Model
      * que cambia el curso actual se registra la inscripción, y el estado de
      * aprobación pasa a ser el de ese curso (antes arrastraba el del curso
      * anterior, y con él un certificado que no correspondía).
+     *
+     * Regla: el curso actual es siempre uno con el pago aprobado. Por eso, al
+     * asignar un curso, el pago del estudiante queda aprobado; para sacarlo
+     * de un curso sin pagar está `retirarDeCurso()`.
      */
     protected static function booted(): void
     {
         static::saving(function (Estudiante $estudiante) {
+            if ($estudiante->isDirty('curso_id') && $estudiante->curso_id) {
+                $estudiante->estado_pago = 'aprobado';
+            }
+
             if (
                 $estudiante->exists &&
                 $estudiante->isDirty('curso_id') &&
@@ -80,6 +88,42 @@ class Estudiante extends Model
             $inscripcion->estado_aprobacion_curso = $estudiante->estado_aprobacion_curso ?? 'pendiente';
             $inscripcion->save();
         });
+    }
+
+    /**
+     * Saca al estudiante de un curso cuyo pago no está aprobado. La
+     * inscripción se conserva con ese estado (el listado interno del curso la
+     * sigue mostrando), pero deja de dar acceso. Si era su curso actual,
+     * vuelve al último curso pagado que le quede o se queda sin curso.
+     *
+     * @param  'pendiente'|'reprobado'  $estadoPago
+     */
+    public function retirarDeCurso(int $cursoId, string $estadoPago): void
+    {
+        $inscripcion = Inscripcion::firstOrNew([
+            'estudiante_id' => $this->id,
+            'curso_id' => $cursoId,
+        ]);
+        $inscripcion->estado_pago = $estadoPago;
+        $inscripcion->fecha_inscripcion ??= now()->toDateString();
+        $inscripcion->save();
+
+        if ($this->curso_id && (int) $this->curso_id !== $cursoId) {
+            return;
+        }
+
+        $anterior = $this->curso_id
+            ? $this->inscripciones()
+                ->where('estado_pago', 'aprobado')
+                ->orderByDesc('fecha_inscripcion')
+                ->orderByDesc('id')
+                ->first()
+            : null;
+
+        $this->update([
+            'curso_id' => $anterior?->curso_id,
+            'estado_pago' => $anterior ? 'aprobado' : $estadoPago,
+        ]);
     }
 
     public function user()

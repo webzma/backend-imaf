@@ -6,6 +6,7 @@ use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\Pago;
 use App\Models\Profesor;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class ReporteController extends Controller
@@ -13,6 +14,7 @@ class ReporteController extends Controller
     public function index(Request $request)
     {
         $periodo = $request->get('periodo', 'mensual');
+        $periodo = array_key_exists($periodo, self::VENTANA) ? $periodo : 'mensual';
 
         $ingresos = $this->ingresosPorPeriodo($periodo);
         $pagosUsuario = $this->pagosPorUsuario();
@@ -24,6 +26,7 @@ class ReporteController extends Controller
             'pagos_por_usuario' => $pagosUsuario,
             'pagos_por_curso' => $pagosCurso,
             'resumen' => $resumen,
+            'periodo' => $this->resumenPeriodo($periodo),
             // Estos cuatro se calculaban en el navegador sobre la primera
             // página de cada lista: con más de diez registros, la pantalla de
             // reportes publicaba números que no eran ciertos.
@@ -81,61 +84,145 @@ class ReporteController extends Controller
             ->toArray();
     }
 
-    private function ingresosPorPeriodo(string $periodo): array
+    /** Cuántos períodos muestra la serie y la ventana del resumen. */
+    private const VENTANA = ['semanal' => 12, 'mensual' => 12, 'anual' => 5];
+
+    /**
+     * Inicio del período que contiene `$fecha` (semana ISO, mes o año).
+     */
+    private function inicioPeriodo(Carbon $fecha, string $periodo): Carbon
     {
-        $desde = match ($periodo) {
-            'semanal' => now()->subWeeks(12),
-            'anual' => now()->subYears(5),
-            default => now()->subMonths(12),
+        return match ($periodo) {
+            'semanal' => $fecha->copy()->startOfWeek(Carbon::MONDAY),
+            'anual' => $fecha->copy()->startOfYear(),
+            default => $fecha->copy()->startOfMonth(),
         };
+    }
 
-        $etiqueta = $this->expresionPeriodo($periodo);
+    private function sumarPeriodos(Carbon $fecha, string $periodo, int $n): Carbon
+    {
+        return match ($periodo) {
+            'semanal' => $fecha->copy()->addWeeks($n),
+            'anual' => $fecha->copy()->addYears($n),
+            default => $fecha->copy()->addMonths($n),
+        };
+    }
 
-        $query = Pago::query()
-            ->join('cursos', 'pagos.curso_id', '=', 'cursos.id')
-            ->where('pagos.estado', 'aprobado')
-            ->whereNull('pagos.deleted_at')
-            ->where('pagos.created_at', '>=', $desde)
-            ->selectRaw("{$etiqueta} as label, SUM(cursos.precio) as total, COUNT(pagos.id) as cantidad")
-            ->groupByRaw($etiqueta)
-            ->orderByRaw($etiqueta);
-
-        return $query->get()->map(fn ($row) => [
-            'label' => (string) $row->label,
-            'total' => (float) $row->total,
-            'cantidad' => (int) $row->cantidad,
-        ])->toArray();
+    private function etiqueta(Carbon $fecha, string $periodo): string
+    {
+        return match ($periodo) {
+            'semanal' => $fecha->format('o-\WW'),
+            'anual' => $fecha->format('Y'),
+            default => $fecha->format('Y-m'),
+        };
     }
 
     /**
-     * Expresión que agrupa por periodo, según el motor de base de datos.
+     * Serie continua de los últimos N períodos, con ceros donde no hubo pagos.
      *
-     * `DATE_FORMAT` solo existe en MySQL, así que esta pantalla devolvía un
-     * error 500 en cualquier otro motor — incluido el SQLite en memoria de los
-     * tests, que es la razón por la que el reporte no tenía ninguno.
+     * Antes se agrupaba en SQL y los períodos sin pagos simplemente no
+     * aparecían: el eje saltaba de marzo a junio sin avisar. Ahora se agrupa
+     * aquí (el volumen es pequeño) y la misma lógica sirve en cualquier motor.
      */
-    private function expresionPeriodo(string $periodo): string
+    private function ingresosPorPeriodo(string $periodo): array
     {
-        $driver = Pago::query()->getConnection()->getDriverName();
-        $columna = 'pagos.created_at';
+        $n = self::VENTANA[$periodo];
+        $actual = $this->inicioPeriodo(now(), $periodo);
+        $desde = $this->sumarPeriodos($actual, $periodo, -($n - 1));
 
-        return match ($driver) {
-            'sqlite' => match ($periodo) {
-                'semanal' => "strftime('%Y-W%W', {$columna})",
-                'anual' => "strftime('%Y', {$columna})",
-                default => "strftime('%Y-%m', {$columna})",
-            },
-            'pgsql' => match ($periodo) {
-                'semanal' => "to_char({$columna}, 'IYYY\"-W\"IW')",
-                'anual' => "to_char({$columna}, 'YYYY')",
-                default => "to_char({$columna}, 'YYYY-MM')",
-            },
-            default => match ($periodo) {
-                'semanal' => "DATE_FORMAT({$columna}, '%x-W%v')",
-                'anual' => "YEAR({$columna})",
-                default => "DATE_FORMAT({$columna}, '%Y-%m')",
-            },
+        $serie = [];
+        for ($i = 0; $i < $n; $i++) {
+            $inicio = $this->sumarPeriodos($desde, $periodo, $i);
+            $serie[$this->etiqueta($inicio, $periodo)] = [
+                'label' => $this->etiqueta($inicio, $periodo),
+                'desde' => $inicio->toDateString(),
+                'total' => 0.0,
+                'cantidad' => 0,
+                'aprobados' => 0,
+                'pendientes' => 0,
+                'rechazados' => 0,
+            ];
+        }
+
+        foreach ($this->pagosDesde($desde) as $pago) {
+            $clave = $this->etiqueta($this->inicioPeriodo(Carbon::parse($pago->created_at), $periodo), $periodo);
+            if (! isset($serie[$clave])) {
+                continue;
+            }
+            match ($pago->estado) {
+                'aprobado' => $serie[$clave]['aprobados']++,
+                'pendiente' => $serie[$clave]['pendientes']++,
+                'rechazado' => $serie[$clave]['rechazados']++,
+                default => null,
+            };
+            if ($pago->estado === 'aprobado') {
+                $serie[$clave]['total'] += (float) $pago->precio;
+                $serie[$clave]['cantidad']++;
+            }
+        }
+
+        return array_values($serie);
+    }
+
+    /**
+     * Resumen de la ventana actual (los mismos N períodos de la serie)
+     * comparado con la ventana anterior de igual duración.
+     *
+     * El resumen de siempre es histórico; la pantalla lo presentaba como "del
+     * período seleccionado" y no cambiaba al cambiar de período.
+     */
+    private function resumenPeriodo(string $periodo): array
+    {
+        $n = self::VENTANA[$periodo];
+        $finActual = $this->sumarPeriodos($this->inicioPeriodo(now(), $periodo), $periodo, 1);
+        $desdeActual = $this->sumarPeriodos($finActual, $periodo, -$n);
+        $desdeAnterior = $this->sumarPeriodos($desdeActual, $periodo, -$n);
+
+        $pagos = $this->pagosDesde($desdeAnterior);
+
+        $agregar = function (Carbon $desde, Carbon $hasta) use ($pagos) {
+            $tramo = $pagos->filter(fn ($p) => Carbon::parse($p->created_at)->gte($desde)
+                && Carbon::parse($p->created_at)->lt($hasta));
+            $aprobados = $tramo->where('estado', 'aprobado');
+
+            return [
+                'ingresos' => (float) $aprobados->sum(fn ($p) => (float) $p->precio),
+                'total_pagos' => $tramo->count(),
+                'aprobados' => $aprobados->count(),
+                'pendientes' => $tramo->where('estado', 'pendiente')->count(),
+                'rechazados' => $tramo->where('estado', 'rechazado')->count(),
+            ];
         };
+
+        $metodos = $pagos
+            ->filter(fn ($p) => $p->estado === 'aprobado' && Carbon::parse($p->created_at)->gte($desdeActual))
+            ->groupBy(fn ($p) => $p->metodo_pago ?: 'sin_especificar')
+            ->map(fn ($grupo, $metodo) => [
+                'metodo' => $metodo,
+                'cantidad' => $grupo->count(),
+                'ingresos' => (float) $grupo->sum(fn ($p) => (float) $p->precio),
+            ])
+            ->sortByDesc('ingresos')
+            ->values()
+            ->all();
+
+        return [
+            'desde' => $desdeActual->toDateString(),
+            'hasta' => $finActual->copy()->subDay()->toDateString(),
+            'actual' => $agregar($desdeActual, $finActual),
+            'anterior' => $agregar($desdeAnterior, $desdeActual),
+            'metodos_pago' => $metodos,
+        ];
+    }
+
+    /** Pagos (sin borrar) desde una fecha, con el precio de su curso. */
+    private function pagosDesde(Carbon $desde)
+    {
+        return Pago::query()
+            ->join('cursos', 'pagos.curso_id', '=', 'cursos.id')
+            ->whereNull('pagos.deleted_at')
+            ->where('pagos.created_at', '>=', $desde)
+            ->get(['pagos.estado', 'pagos.metodo_pago', 'pagos.created_at', 'cursos.precio']);
     }
 
     private function pagosPorUsuario(): array

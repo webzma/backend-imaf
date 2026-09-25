@@ -215,6 +215,15 @@ class EstudianteController extends Controller
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
+        // Defensa: aunque `curso_id` quedara apuntando a un curso sin pago
+        // aprobado (datos antiguos), el estudiante no lo ve como suyo.
+        if (
+            $estudiante->curso_id &&
+            ! $estudiante->cursos()->whereKey($estudiante->curso_id)->exists()
+        ) {
+            $estudiante->setRelation('curso', null);
+        }
+
         return response()->json($estudiante);
     }
 
@@ -295,9 +304,9 @@ class EstudianteController extends Controller
                     ],
                 ),
             ],
-            // Solo el curso actual puede tener el pago en revisión; los
-            // anteriores quedaron inscritos con el pago aprobado.
-            'estado_pago' => $esActual ? $estudiante->estado_pago : 'aprobado',
+            // `cursos()` solo devuelve inscripciones con el pago aprobado: si
+            // el curso aparece aquí es porque está pagado.
+            'estado_pago' => $curso->pivot->estado_pago,
             'estado_aprobacion_curso' => $curso->pivot->estado_aprobacion_curso,
             'es_actual' => $esActual,
         ]);
@@ -573,19 +582,37 @@ class EstudianteController extends Controller
             'estado_pago' => 'required|in:pendiente,aprobado,reprobado',
         ]);
 
-        $estudiante->update($data);
+        $anterior = $estudiante->estado_pago;
+        $curso = $estudiante->curso;
 
-        if (
-            $estudiante->wasChanged('estado_pago') &&
-            in_array($estudiante->estado_pago, ['aprobado', 'reprobado'], true)
-        ) {
-            $this->notifySolicitudCursoSiHayCurso(
-                $estudiante,
-                SolicitudCursoProcesada::TIPO_APROBACION_PAGO,
-            );
+        // El estado de pago es el del curso actual. Si deja de estar
+        // aprobado, el estudiante sale del curso: antes seguía dentro con el
+        // pago "reprobado" a la vista.
+        if ($curso && $data['estado_pago'] !== 'aprobado') {
+            $estudiante->retirarDeCurso((int) $curso->id, $data['estado_pago']);
+        } else {
+            $estudiante->update($data);
+            if ($curso) {
+                Inscripcion::where('estudiante_id', $estudiante->id)
+                    ->where('curso_id', $curso->id)
+                    ->update(['estado_pago' => 'aprobado']);
+            }
         }
 
-        return response()->json($estudiante->load('user', 'curso'));
+        if (
+            $curso &&
+            $anterior !== $data['estado_pago'] &&
+            in_array($data['estado_pago'], ['aprobado', 'reprobado'], true)
+        ) {
+            $estudiante->user?->notify(new SolicitudCursoProcesada(
+                nombreCurso: $curso->nombre,
+                estado: $data['estado_pago'],
+                cursoId: (int) $curso->id,
+                tipo: SolicitudCursoProcesada::TIPO_APROBACION_PAGO,
+            ));
+        }
+
+        return response()->json($estudiante->fresh()->load('user', 'curso'));
     }
 
     /**
@@ -671,34 +698,5 @@ class EstudianteController extends Controller
         $estudiante->setAttribute('estado_aprobacion_curso', $nuevoEstado);
 
         return response()->json($estudiante->load('user', 'curso'));
-    }
-
-    private function notifySolicitudCursoSiHayCurso(
-        Estudiante $estudiante,
-        string $tipo,
-    ): void {
-        $curso = $estudiante->curso;
-        if (! $curso || ! $estudiante->user) {
-            return;
-        }
-
-        $estadoNotif = match ($tipo) {
-            SolicitudCursoProcesada::TIPO_APROBACION_PAGO => $estudiante->estado_pago,
-            SolicitudCursoProcesada::TIPO_APROBACION_CURSO => $estudiante->estado_aprobacion_curso,
-            default => 'pendiente',
-        };
-
-        if (! in_array($estadoNotif, ['aprobado', 'reprobado'], true)) {
-            return;
-        }
-
-        $estudiante->user->notify(
-            new SolicitudCursoProcesada(
-                nombreCurso: $curso->nombre,
-                estado: $estadoNotif,
-                cursoId: (int) $curso->id,
-                tipo: $tipo,
-            ),
-        );
     }
 }

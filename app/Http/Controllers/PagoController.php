@@ -368,31 +368,7 @@ class PagoController extends Controller
             return;
         }
 
-        $inscripcion = Inscripcion::firstOrNew([
-            'estudiante_id' => $estudiante->id,
-            'curso_id' => $pago->curso_id,
-        ]);
-        $inscripcion->estado_pago = 'reprobado';
-        $inscripcion->fecha_inscripcion ??= now()->toDateString();
-        $inscripcion->save();
-
-        $eraActual = (int) $estudiante->curso_id === (int) $pago->curso_id;
-        if (! $eraActual && $estudiante->curso_id) {
-            return;
-        }
-
-        $anterior = $eraActual
-            ? $estudiante->inscripciones()
-                ->where('estado_pago', 'aprobado')
-                ->orderByDesc('fecha_inscripcion')
-                ->orderByDesc('id')
-                ->first()
-            : null;
-
-        $estudiante->update([
-            'curso_id' => $anterior?->curso_id,
-            'estado_pago' => $anterior ? 'aprobado' : 'reprobado',
-        ]);
+        $estudiante->retirarDeCurso((int) $pago->curso_id, 'reprobado');
     }
 
     /** Avisa al estudiante de la decisión sobre su pago. */

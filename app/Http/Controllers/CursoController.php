@@ -204,7 +204,10 @@ class CursoController extends Controller
                 ->orderByDesc('id')
                 ->first();
 
-            $estudiante->update(['curso_id' => $anterior?->curso_id]);
+            $estudiante->update([
+                'curso_id' => $anterior?->curso_id,
+                'estado_pago' => $anterior ? 'aprobado' : 'pendiente',
+            ]);
         }
 
         return response()->json(['message' => 'Estudiante quitado del curso.']);

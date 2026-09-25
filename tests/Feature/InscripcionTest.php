@@ -9,6 +9,7 @@ use App\Models\Pago;
 use App\Models\User;
 use App\Notifications\GenericNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -242,6 +243,110 @@ class InscripcionTest extends TestCase
             ->assertJsonPath('sede', Curso::SEDE);
         $this->getJson('/api/estudiante/curso')->assertJsonPath('curso.modalidad', 'presencial');
         $this->getJson('/api/estudiante/mis-cursos')->assertJsonPath('cursos.0.modalidad', 'presencial');
+    }
+
+    public function test_con_la_solicitud_en_revision_el_estudiante_no_esta_en_el_curso(): void
+    {
+        $curso = Curso::factory()->create();
+        $estudiante = Estudiante::factory()->create();
+
+        Sanctum::actingAs($estudiante->user);
+        $this->postJson('/api/estudiante/pagos', ['curso_id' => $curso->id, 'metodo_pago' => 'efectivo'])
+            ->assertCreated();
+
+        $this->assertNull($estudiante->fresh()->curso_id);
+        $this->assertNull($this->getJson('/api/estudiante/perfil')->json('curso'));
+        $this->getJson('/api/estudiante/curso')->assertNotFound();
+        $this->getJson("/api/estudiante/curso?curso_id={$curso->id}")->assertNotFound();
+        $this->assertSame(
+            [$curso->id],
+            collect($this->getJson('/api/estudiante/mis-cursos')->json('solicitudes_pendientes'))->pluck('curso_id')->all(),
+        );
+    }
+
+    public function test_marcar_el_pago_como_no_aprobado_saca_al_estudiante_del_curso(): void
+    {
+        $anterior = Curso::factory()->create();
+        $curso = Curso::factory()->create();
+        $estudiante = Estudiante::factory()->create(['curso_id' => $anterior->id]);
+        $estudiante->update(['curso_id' => $curso->id]);
+
+        Sanctum::actingAs($this->admin);
+        $this->patchJson("/api/admin/estudiantes/{$estudiante->id}/estado-pago", ['estado_pago' => 'reprobado'])
+            ->assertOk();
+
+        $estudiante->refresh();
+        $this->assertSame($anterior->id, $estudiante->curso_id);
+        $this->assertSame('aprobado', $estudiante->estado_pago);
+        $this->assertSame('reprobado', $this->listadoInterno($curso)[$estudiante->id]['estado_pago']);
+
+        Sanctum::actingAs($estudiante->user);
+        $this->getJson('/api/estudiante/curso')
+            ->assertOk()
+            ->assertJsonPath('curso.id', $anterior->id)
+            ->assertJsonPath('estado_pago', 'aprobado');
+    }
+
+    public function test_asignar_un_curso_deja_el_pago_al_dia(): void
+    {
+        $curso = Curso::factory()->create();
+        $estudiante = Estudiante::factory()->create(['estado_pago' => 'pendiente']);
+
+        $estudiante->update(['curso_id' => $curso->id]);
+
+        $this->assertSame('aprobado', $estudiante->fresh()->estado_pago);
+    }
+
+    public function test_el_perfil_no_muestra_un_curso_sin_pago_aprobado(): void
+    {
+        $curso = Curso::factory()->create();
+        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        // Datos antiguos: curso actual con la inscripción sin pagar.
+        Inscripcion::where('estudiante_id', $estudiante->id)->update(['estado_pago' => 'reprobado']);
+
+        Sanctum::actingAs($estudiante->user);
+        $this->assertNull($this->getJson('/api/estudiante/perfil')->json('curso'));
+        $this->getJson('/api/estudiante/curso')->assertNotFound();
+    }
+
+    public function test_la_migracion_alinea_el_curso_actual_con_el_pago(): void
+    {
+        $pagado = Curso::factory()->create();
+        $rechazado = Curso::factory()->create();
+        $enRevision = Curso::factory()->create();
+        $manual = Curso::factory()->create();
+
+        $conRechazo = Estudiante::factory()->create(['curso_id' => $pagado->id]);
+        $conPendiente = Estudiante::factory()->create();
+        $sinPagos = Estudiante::factory()->create();
+
+        // Estado roto, como lo dejaba el código anterior.
+        DB::table('estudiantes')->where('id', $conRechazo->id)
+            ->update(['curso_id' => $rechazado->id, 'estado_pago' => 'reprobado']);
+        DB::table('inscripciones')->insert(['estudiante_id' => $conRechazo->id, 'curso_id' => $rechazado->id, 'estado_pago' => 'aprobado', 'estado_aprobacion_curso' => 'pendiente']);
+        $this->pagoPendiente($conRechazo, $rechazado)->update(['estado' => 'rechazado']);
+
+        DB::table('estudiantes')->where('id', $conPendiente->id)
+            ->update(['curso_id' => $enRevision->id, 'estado_pago' => 'pendiente']);
+        $this->pagoPendiente($conPendiente, $enRevision);
+
+        DB::table('estudiantes')->where('id', $sinPagos->id)
+            ->update(['curso_id' => $manual->id, 'estado_pago' => 'pendiente']);
+
+        (require database_path('migrations/2026_09_25_000000_alinear_curso_actual_con_pago_aprobado.php'))->up();
+
+        $conRechazo->refresh();
+        $this->assertSame($pagado->id, $conRechazo->curso_id);
+        $this->assertSame('aprobado', $conRechazo->estado_pago);
+        $this->assertSame('reprobado', Inscripcion::where('estudiante_id', $conRechazo->id)->where('curso_id', $rechazado->id)->value('estado_pago'));
+
+        $conPendiente->refresh();
+        $this->assertNull($conPendiente->curso_id);
+        $this->assertSame('pendiente', $conPendiente->estado_pago);
+
+        $sinPagos->refresh();
+        $this->assertSame($manual->id, $sinPagos->curso_id);
+        $this->assertSame('aprobado', $sinPagos->estado_pago);
     }
 
     public function test_aprobar_un_segundo_curso_conserva_el_anterior(): void
