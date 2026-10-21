@@ -2,10 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 
 class TipoContrato extends Model
 {
+    use Auditable;
+
+    protected string $auditEntidad = 'tipo_contrato';
+
+    protected string $auditNombre = 'tipo de contrato';
+
     protected $table = 'tipo_contratos';
 
     protected $fillable = [

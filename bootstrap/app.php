@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AsignarSolicitudId;
 use App\Http\Middleware\CheckRole;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => CheckRole::class,
         ]);
+        $middleware->api(prepend: [AsignarSolicitudId::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

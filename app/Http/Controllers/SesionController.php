@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Curso;
 use App\Models\Profesor;
 use App\Models\Sesion;
+use App\Models\Temario;
 use App\Notifications\GenericNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -148,7 +149,8 @@ class SesionController extends Controller
     {
         $data = $request->validate([
             'curso_id' => 'required|exists:cursos,id',
-            'titulo' => 'required|string|max:255',
+            'temario_id' => 'nullable|integer|exists:temarios,id',
+            'titulo' => 'required_without:temario_id|nullable|string|max:255',
             'descripcion' => 'nullable|string',
             'fecha' => 'required|date',
             'hora_inicio' => 'nullable|date_format:H:i',
@@ -165,6 +167,8 @@ class SesionController extends Controller
             );
         }
 
+        $data = $this->aplicarTema($data, (int) $data['curso_id']);
+
         $sesion = Sesion::create($data);
         $sesion->load(['curso.instructor.user']);
 
@@ -179,7 +183,8 @@ class SesionController extends Controller
 
         $data = $request->validate([
             'curso_id' => 'sometimes|exists:cursos,id',
-            'titulo' => 'sometimes|string|max:255',
+            'temario_id' => 'nullable|integer|exists:temarios,id',
+            'titulo' => 'sometimes|nullable|string|max:255',
             'descripcion' => 'nullable|string',
             'fecha' => 'sometimes|date',
             'hora_inicio' => 'nullable|date_format:H:i',
@@ -197,6 +202,8 @@ class SesionController extends Controller
                 $sesion->id,
             );
         }
+
+        $data = $this->aplicarTema($data, (int) ($data['curso_id'] ?? $sesion->curso_id), $sesion);
 
         $sesion->update($data);
         $sesion->load(['curso.instructor.user']);
@@ -222,7 +229,8 @@ class SesionController extends Controller
         Curso::findOrFail($cursoId);
 
         $data = $request->validate([
-            'titulo' => 'required|string|max:255',
+            'temario_id' => 'nullable|integer|exists:temarios,id',
+            'titulo' => 'required_without:temario_id|nullable|string|max:255',
             'descripcion' => 'nullable|string',
             'fecha' => 'required|date',
             'hora_inicio' => 'nullable|date_format:H:i',
@@ -239,6 +247,8 @@ class SesionController extends Controller
             );
         }
 
+        $data = $this->aplicarTema($data, (int) $cursoId);
+
         $sesion = Sesion::create(['curso_id' => $cursoId, ...$data]);
 
         $this->notifyInstructor($cursoId, 'agregado');
@@ -251,7 +261,8 @@ class SesionController extends Controller
         $sesion = Sesion::where('curso_id', $cursoId)->findOrFail($id);
 
         $data = $request->validate([
-            'titulo' => 'sometimes|string|max:255',
+            'temario_id' => 'nullable|integer|exists:temarios,id',
+            'titulo' => 'sometimes|nullable|string|max:255',
             'descripcion' => 'nullable|string',
             'fecha' => 'sometimes|date',
             'hora_inicio' => 'nullable|date_format:H:i',
@@ -270,6 +281,8 @@ class SesionController extends Controller
             );
         }
 
+        $data = $this->aplicarTema($data, (int) $cursoId, $sesion);
+
         $sesion->update($data);
 
         $this->notifyInstructor($cursoId, 'actualizado');
@@ -285,5 +298,57 @@ class SesionController extends Controller
         $this->notifyInstructor($cursoId, 'eliminado');
 
         return response()->json(['message' => 'Sesión eliminada.']);
+    }
+
+    /**
+     * Si la sesión corresponde a un tema del temario, el título sale del
+     * tema (así no se escribe dos veces ni se desincroniza). El tema debe ser
+     * del mismo curso. Al cambiar una sesión de curso sin indicar tema, el
+     * enlace con el tema anterior se suelta.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function aplicarTema(array $data, int $cursoId, ?Sesion $sesion = null): array
+    {
+        $temaPedido = array_key_exists('temario_id', $data);
+        $temaId = $temaPedido ? $data['temario_id'] : $sesion?->temario_id;
+
+        if (! $temaId) {
+            if ($temaPedido || ! $sesion) {
+                $data['temario_id'] = null;
+            }
+            if (blank($data['titulo'] ?? null)) {
+                if (! $sesion) {
+                    throw ValidationException::withMessages([
+                        'titulo' => ['Elige un tema del temario o escribe un título.'],
+                    ]);
+                }
+                // Al editar sin título nuevo se conserva el actual.
+                unset($data['titulo']);
+            }
+
+            return $data;
+        }
+
+        $tema = Temario::find($temaId);
+
+        if (! $tema || (int) $tema->curso_id !== $cursoId) {
+            if (! $temaPedido) {
+                // La sesión cambió de curso: el tema anterior ya no aplica.
+                $data['temario_id'] = null;
+
+                return $data;
+            }
+
+            throw ValidationException::withMessages([
+                'temario_id' => ['El tema elegido no pertenece al temario de este curso.'],
+            ]);
+        }
+
+        $data['temario_id'] = $tema->id;
+        $data['titulo'] = $tema->titulo;
+
+        return $data;
     }
 }

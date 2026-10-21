@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Curso;
 use App\Models\Profesor;
 use App\Models\Sesion;
+use App\Models\Temario;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -265,5 +266,73 @@ class SesionTest extends TestCase
             ->assertOk();
 
         $this->assertDatabaseMissing('sesiones', ['id' => $sesion->id]);
+    }
+
+    public function test_la_sesion_toma_el_titulo_del_tema_elegido(): void
+    {
+        $curso = Curso::factory()->create();
+        $tema = Temario::create(['curso_id' => $curso->id, 'titulo' => 'Introducción al dibujo', 'orden' => 1]);
+
+        $this->postJson("/api/admin/cursos/{$curso->id}/sesiones", [
+            'temario_id' => $tema->id,
+            'fecha' => '2026-10-21',
+            'estado' => 'programada',
+        ])->assertCreated()
+            ->assertJsonPath('temario_id', $tema->id)
+            ->assertJsonPath('titulo', 'Introducción al dibujo');
+    }
+
+    public function test_rechaza_un_tema_de_otro_curso(): void
+    {
+        $curso = Curso::factory()->create();
+        $ajeno = Temario::create(['curso_id' => Curso::factory()->create()->id, 'titulo' => 'Ajeno', 'orden' => 1]);
+
+        $this->postJson('/api/admin/sesiones', [
+            'curso_id' => $curso->id,
+            'temario_id' => $ajeno->id,
+            'fecha' => '2026-10-21',
+        ])->assertStatus(422)->assertJsonValidationErrors('temario_id');
+    }
+
+    public function test_sin_tema_exige_un_titulo(): void
+    {
+        $curso = Curso::factory()->create();
+
+        $this->postJson("/api/admin/cursos/{$curso->id}/sesiones", ['fecha' => '2026-10-21'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('titulo');
+
+        $this->postJson("/api/admin/cursos/{$curso->id}/sesiones", ['titulo' => 'Evaluación final', 'fecha' => '2026-10-21'])
+            ->assertCreated()
+            ->assertJsonPath('temario_id', null);
+    }
+
+    public function test_renombrar_el_tema_actualiza_sus_sesiones(): void
+    {
+        $curso = Curso::factory()->create();
+        $tema = Temario::create(['curso_id' => $curso->id, 'titulo' => 'Tema viejo', 'orden' => 1]);
+        $sesion = $this->postJson("/api/admin/cursos/{$curso->id}/sesiones", [
+            'temario_id' => $tema->id,
+            'fecha' => '2026-10-21',
+        ])->json('id');
+
+        $this->putJson("/api/admin/cursos/{$curso->id}/temario/{$tema->id}", ['titulo' => 'Tema nuevo'])->assertOk();
+
+        $this->assertDatabaseHas('sesiones', ['id' => $sesion, 'titulo' => 'Tema nuevo', 'temario_id' => $tema->id]);
+    }
+
+    public function test_editar_sin_cambiar_el_titulo_lo_conserva(): void
+    {
+        $curso = Curso::factory()->create();
+        $tema = Temario::create(['curso_id' => $curso->id, 'titulo' => 'Color', 'orden' => 1]);
+        $sesion = $this->postJson("/api/admin/cursos/{$curso->id}/sesiones", [
+            'temario_id' => $tema->id,
+            'fecha' => '2026-10-21',
+        ])->json('id');
+
+        $this->putJson("/api/admin/cursos/{$curso->id}/sesiones/{$sesion}", ['estado' => 'realizada'])
+            ->assertOk()
+            ->assertJsonPath('titulo', 'Color')
+            ->assertJsonPath('temario_id', $tema->id);
     }
 }

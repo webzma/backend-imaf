@@ -9,6 +9,7 @@ use App\Models\Pago;
 use App\Models\Profesor;
 use App\Models\User;
 use App\Notifications\GenericNotification;
+use App\Services\Auditoria;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -131,6 +132,15 @@ class PagoController extends Controller
                 '/admin/pagos'
             ));
         }
+
+        Auditoria::registrar('pago.reportado', "Pago reportado por {$user->name} para «{$curso->nombre}» ({$metodoLabel})", [
+            'entidad' => $pago,
+            'metadatos' => [
+                'curso_id' => $curso->id,
+                'metodo_pago' => $request->metodo_pago,
+                'monto' => (float) $curso->precio,
+            ],
+        ]);
 
         return response()->json($pago->load('curso'), 201);
     }
@@ -262,6 +272,15 @@ class PagoController extends Controller
             }
         }
 
+        Auditoria::registrar('pago.procesamiento_masivo', "Procesamiento masivo de pagos: {$procesados} {$datos['estado']}, ".count($fallidos).' sin procesar', [
+            'metadatos' => [
+                'ids' => $datos['ids'],
+                'estado' => $datos['estado'],
+                'procesados' => $procesados,
+                'fallidos' => $fallidos,
+            ],
+        ]);
+
         return response()->json([
             'procesados' => $procesados,
             'fallidos' => $fallidos,
@@ -320,6 +339,11 @@ class PagoController extends Controller
         });
 
         if ($cupoAgotado) {
+            Auditoria::registrar('pago.aprobacion_sin_cupo', 'No se aprobó el pago: el curso no tiene cupos', [
+                'nivel' => 'aviso',
+                'entidad' => $pago,
+            ]);
+
             return [
                 'ok' => false,
                 'message' => 'No se puede aprobar: el curso ya no tiene cupos disponibles.',
@@ -329,6 +353,19 @@ class PagoController extends Controller
         $pago->refresh();
 
         $this->notificarEstudiante($pago, $estado, $nota);
+
+        Auditoria::registrar(
+            $estado === 'aprobado' ? 'pago.aprobado' : 'pago.rechazado',
+            ($estado === 'aprobado' ? 'Pago aprobado: ' : 'Pago rechazado: ').$pago->auditEtiqueta(),
+            [
+                'entidad' => $pago,
+                'metadatos' => [
+                    'curso_id' => $pago->curso_id,
+                    'monto' => (float) ($pago->curso->precio ?? 0),
+                    'nota_admin' => $nota,
+                ],
+            ],
+        );
 
         // Si el pago fue aprobado, notificar al profesor del curso
         if ($estado === 'aprobado') {

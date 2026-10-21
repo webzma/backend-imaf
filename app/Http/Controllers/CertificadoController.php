@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Estudiante;
+use App\Services\Auditoria;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -58,6 +59,11 @@ class CertificadoController extends Controller
                 ->setPaper('a4', 'landscape');
 
             $filename = 'certificado_'.str($estudiante->nombre)->slug().'.pdf';
+
+            Auditoria::registrar('certificado.descargado', "Descarga del certificado de {$estudiante->nombre} del curso «{$curso->nombre}»", [
+                'entidad' => $estudiante,
+                'metadatos' => ['curso_id' => $curso->id],
+            ]);
 
             return $pdf->download($filename);
         } catch (\Exception $e) {

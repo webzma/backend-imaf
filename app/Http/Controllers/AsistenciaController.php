@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Asistencia;
 use App\Models\Estudiante;
 use App\Models\Sesion;
+use App\Services\Auditoria;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,6 +18,11 @@ class AsistenciaController extends Controller
         $authUser = Auth::user();
         if ($authUser->isProfesor()) {
             if ((int) $sesion->curso->profesor_id !== (int) $authUser->profesor->id) {
+                Auditoria::registrar('seguridad.acceso_denegado', "Intento de acceder a la asistencia de una sesión de un curso ajeno (#{$sesion->id})", [
+                    'nivel' => 'aviso',
+                    'metadatos' => ['sesion_id' => $sesion->id, 'curso_id' => $sesion->curso_id],
+                ]);
+
                 return response()->json(['message' => 'No autorizado.'], 403);
             }
         }
@@ -64,6 +70,11 @@ class AsistenciaController extends Controller
         $authUser = Auth::user();
         if ($authUser->isProfesor()) {
             if ((int) $sesion->curso->profesor_id !== (int) $authUser->profesor->id) {
+                Auditoria::registrar('seguridad.acceso_denegado', "Intento de acceder a la asistencia de una sesión de un curso ajeno (#{$sesion->id})", [
+                    'nivel' => 'aviso',
+                    'metadatos' => ['sesion_id' => $sesion->id, 'curso_id' => $sesion->curso_id],
+                ]);
+
                 return response()->json(['message' => 'No autorizado.'], 403);
             }
         }
@@ -89,6 +100,17 @@ class AsistenciaController extends Controller
             ['sesion_id', 'estudiante_id'],
             ['presente', 'observacion', 'updated_at']
         );
+
+        $presentes = collect($data['asistencia'])->where('presente', true)->count();
+        Auditoria::registrar('asistencia.registrada', "Asistencia de la sesión «{$sesion->titulo}»: {$presentes} de ".count($registros).' presentes', [
+            'entidad' => ['sesion', $sesion->id, $sesion->titulo],
+            'metadatos' => [
+                'curso_id' => $sesion->curso_id,
+                'presentes' => $presentes,
+                'total' => count($registros),
+                'ausentes_ids' => collect($data['asistencia'])->where('presente', false)->pluck('estudiante_id')->values()->all(),
+            ],
+        ]);
 
         return response()->json(['message' => 'Asistencia guardada.']);
     }

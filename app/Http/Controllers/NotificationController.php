@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\DatabaseNotificationResource;
 use App\Models\User;
 use App\Notifications\GenericNotification;
+use App\Services\Auditoria;
 use Illuminate\Http\Request;
 
 class NotificationController extends Controller
@@ -62,6 +63,11 @@ class NotificationController extends Controller
             $validated['mensaje'],
             $validated['url'] ?? null
         ));
+
+        Auditoria::registrar('notificacion.enviada', "Notificación manual enviada a {$user->email}: «{$validated['titulo']}»", [
+            'entidad' => $user,
+            'metadatos' => ['titulo' => $validated['titulo'], 'url' => $validated['url'] ?? null],
+        ]);
 
         return response()->json(['message' => 'Notificación enviada con éxito.']);
     }

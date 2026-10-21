@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AsistenciaController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BitacoraController;
 use App\Http\Controllers\CatalogoController;
 use App\Http\Controllers\CertificadoController;
 use App\Http\Controllers\CursoController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\EstudianteController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PagoController;
 use App\Http\Controllers\ProfesorController;
+use App\Http\Controllers\PublicoController;
 use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\SesionController;
 use App\Http\Controllers\TemarioController;
@@ -22,6 +24,11 @@ Route::middleware('throttle:10,1')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+});
+
+// Datos públicos de la página de inicio (solo lectura).
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/publico/cursos', [PublicoController::class, 'cursos']);
 });
 
 // Rutas protegidas (requieren token)
@@ -184,6 +191,18 @@ Route::middleware('auth:sanctum')->group(function () {
 
             // Reportes
             Route::get('reportes', [ReporteController::class, 'index']);
+
+            // Bitácora de auditoría (solo lectura). Las rutas fijas van antes
+            // de `bitacora/{id}`.
+            Route::get('bitacora', [BitacoraController::class, 'index']);
+            Route::get('bitacora/resumen', [BitacoraController::class, 'resumen']);
+            Route::get('bitacora/opciones', [BitacoraController::class, 'opciones']);
+            Route::get('bitacora/exportar', [BitacoraController::class, 'exportar']);
+            Route::get('bitacora/entidades/{entidad}/{id}', [
+                BitacoraController::class,
+                'historial',
+            ]);
+            Route::get('bitacora/{id}', [BitacoraController::class, 'show']);
 
             // Catálogos CRUD (DEBE ser la última ruta del grupo admin, después de todas las rutas explícitas)
             Route::get('{slug}', [CatalogoController::class, 'index']);

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -9,6 +10,12 @@ use Illuminate\Support\Str;
 
 class Curso extends Model
 {
+    use Auditable;
+
+    protected string $auditEntidad = 'curso';
+
+    protected string $auditNombre = 'curso';
+
     use HasFactory, SoftDeletes;
 
     /**

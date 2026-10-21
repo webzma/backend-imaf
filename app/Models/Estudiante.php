@@ -2,12 +2,20 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
+use App\Services\Auditoria;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Estudiante extends Model
 {
+    use Auditable;
+
+    protected string $auditEntidad = 'estudiante';
+
+    protected string $auditNombre = 'estudiante';
+
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
@@ -107,6 +115,11 @@ class Estudiante extends Model
         $inscripcion->estado_pago = $estadoPago;
         $inscripcion->fecha_inscripcion ??= now()->toDateString();
         $inscripcion->save();
+
+        Auditoria::registrar('inscripcion.retirada', "Retiro de {$this->nombre} del curso por pago {$estadoPago}", [
+            'entidad' => $inscripcion,
+            'metadatos' => ['curso_id' => $cursoId, 'estado_pago' => $estadoPago, 'era_curso_actual' => (int) $this->curso_id === $cursoId],
+        ]);
 
         if ($this->curso_id && (int) $this->curso_id !== $cursoId) {
             return;

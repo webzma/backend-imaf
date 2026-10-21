@@ -9,6 +9,7 @@ use App\Models\Inscripcion;
 use App\Models\Profesor;
 use App\Notifications\GenericNotification;
 use App\Rules\DiaHabil;
+use App\Services\Auditoria;
 use App\Services\CursoEstadoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -180,6 +181,11 @@ class CursoController extends Controller
                 ->where('curso_id', $curso->id)
                 ->update(['estado_pago' => 'aprobado']);
 
+            Auditoria::registrar('inscripcion.asignada', "Inscripción manual de {$estudiante->nombre} en «{$curso->nombre}»", [
+                'entidad' => $curso,
+                'metadatos' => ['estudiante_id' => $estudiante->id],
+            ]);
+
             return response()->json($this->estudianteEnCurso($curso, $estudiante->id), 201);
         });
     }
@@ -209,6 +215,12 @@ class CursoController extends Controller
                 'estado_pago' => $anterior ? 'aprobado' : 'pendiente',
             ]);
         }
+
+        Auditoria::registrar('inscripcion.eliminada', "Se quitó a {$estudiante->nombre} del curso «{$curso->nombre}»", [
+            'nivel' => 'aviso',
+            'entidad' => $curso,
+            'metadatos' => ['estudiante_id' => $estudiante->id],
+        ]);
 
         return response()->json(['message' => 'Estudiante quitado del curso.']);
     }

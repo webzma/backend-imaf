@@ -2,11 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 
 /** Un curso que un estudiante cursó o cursa. */
 class Inscripcion extends Model
 {
+    use Auditable;
+
+    protected string $auditEntidad = 'inscripcion';
+
+    protected string $auditNombre = 'inscripción';
+
     protected $table = 'inscripciones';
 
     protected $fillable = [
@@ -22,6 +29,15 @@ class Inscripcion extends Model
         return [
             'fecha_inscripcion' => 'date',
         ];
+    }
+
+    /** "Ana Pérez → Dibujo" en la bitácora. */
+    public function auditEtiqueta(): ?string
+    {
+        $estudiante = Estudiante::withTrashed()->find($this->estudiante_id)?->nombre;
+        $curso = Curso::withTrashed()->find($this->curso_id)?->nombre;
+
+        return ($estudiante ?? 'Estudiante #'.$this->estudiante_id).' → '.($curso ?? 'curso #'.$this->curso_id);
     }
 
     public function estudiante()

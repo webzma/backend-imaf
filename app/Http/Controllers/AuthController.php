@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bitacora;
 use App\Models\Estudiante;
 use App\Models\User;
 use App\Notifications\ResetPasswordNotification;
+use App\Services\Auditoria;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -102,6 +104,11 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        Auditoria::registrar('auth.registro', "Registro de la cuenta {$user->email}", [
+            'actor' => $user,
+            'entidad' => $user,
+        ]);
+
         return response()->json(
             [
                 'user' => $user->load('estudiante'),
@@ -121,6 +128,8 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
+            $this->auditarLoginFallido($request, $user);
+
             throw ValidationException::withMessages([
                 'email' => ['Las credenciales son incorrectas.'],
             ]);
@@ -128,9 +137,16 @@ class AuthController extends Controller
 
         // Sesión única: al iniciar sesión se revocan los tokens anteriores,
         // por lo que cualquier otra sesión activa del usuario queda invalidada.
+        $sesionesCerradas = $user->tokens()->count();
         $user->tokens()->delete();
 
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        Auditoria::registrar('auth.login', "Inicio de sesión de {$user->email}", [
+            'actor' => $user,
+            'entidad' => $user,
+            'metadatos' => ['sesiones_anteriores_cerradas' => $sesionesCerradas],
+        ]);
 
         return response()->json([
             'user' => $user,
@@ -138,8 +154,42 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Deja constancia del intento fallido. Si la misma IP acumula varios en
+     * poco tiempo, el evento sube a crítico: es el patrón de un ataque de
+     * fuerza bruta o de relleno de credenciales.
+     */
+    private function auditarLoginFallido(Request $request, ?User $user): void
+    {
+        $ventana = now()->subMinutes(config('auditoria.ventana_logins_fallidos_minutos', 15));
+        $previos = Bitacora::where('evento', 'auth.login_fallido')
+            ->where('ip', $request->ip())
+            ->where('created_at', '>=', $ventana)
+            ->count();
+        $intentos = $previos + 1;
+
+        Auditoria::registrar(
+            'auth.login_fallido',
+            "Intento de inicio de sesión fallido para {$request->email}",
+            [
+                'actor' => null,
+                'nivel' => $intentos >= config('auditoria.umbral_logins_fallidos', 5) ? 'critico' : 'aviso',
+                'entidad' => $user,
+                'metadatos' => [
+                    'email' => $request->email,
+                    'motivo' => $user ? 'contrasena_incorrecta' : 'usuario_inexistente',
+                    'intentos_recientes_ip' => $intentos,
+                ],
+            ],
+        );
+    }
+
     public function logout(Request $request)
     {
+        Auditoria::registrar('auth.logout', "Cierre de sesión de {$request->user()->email}", [
+            'entidad' => $request->user(),
+        ]);
+
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Sesión cerrada correctamente.']);
@@ -201,6 +251,7 @@ class AuthController extends Controller
             }
 
             $user->password = $data['password'];
+            $cambioContrasena = true;
         }
 
         $user->fill(array_intersect_key($data, array_flip([
@@ -208,6 +259,12 @@ class AuthController extends Controller
         ])));
 
         $user->save();
+
+        if ($cambioContrasena ?? false) {
+            Auditoria::registrar('auth.contrasena_cambiada', "Cambio de contraseña de {$user->email}", [
+                'entidad' => $user,
+            ]);
+        }
 
         return response()->json($user->fresh());
     }
@@ -233,6 +290,13 @@ class AuthController extends Controller
 
             $user->notify(new ResetPasswordNotification($token));
         }
+
+        // La respuesta no revela si el correo existe; la bitácora sí lo anota.
+        Auditoria::registrar('auth.recuperacion_solicitada', "Solicitud de recuperación de contraseña para {$request->email}", [
+            'actor' => null,
+            'entidad' => $user,
+            'metadatos' => ['email' => $request->email, 'usuario_existe' => (bool) $user],
+        ]);
 
         return response()->json([
             'message' => 'Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.',
@@ -278,6 +342,12 @@ class AuthController extends Controller
                 ->isPast();
 
         if ($tokenInvalido || $tokenExpirado) {
+            Auditoria::registrar('auth.restablecimiento_fallido', "Restablecimiento de contraseña rechazado para {$request->email}", [
+                'actor' => null,
+                'nivel' => 'aviso',
+                'metadatos' => ['email' => $request->email, 'motivo' => $tokenExpirado ? 'token_expirado' : 'token_invalido'],
+            ]);
+
             // Un token caducado se descarta para que no quede en la tabla.
             if ($tokenExpirado) {
                 DB::table('password_reset_tokens')
@@ -304,6 +374,11 @@ class AuthController extends Controller
         $user->tokens()->delete();
 
         event(new PasswordReset($user));
+
+        Auditoria::registrar('auth.contrasena_restablecida', "Contraseña restablecida para {$user->email}", [
+            'actor' => $user,
+            'entidad' => $user,
+        ]);
 
         DB::table('password_reset_tokens')
             ->where('email', $request->email)

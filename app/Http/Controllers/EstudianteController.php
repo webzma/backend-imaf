@@ -9,6 +9,7 @@ use App\Models\Pago;
 use App\Models\Sesion;
 use App\Models\User;
 use App\Notifications\SolicitudCursoProcesada;
+use App\Services\Auditoria;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -205,6 +206,12 @@ class EstudianteController extends Controller
 
         $actualizados = Estudiante::whereIn('id', $datos['ids'])
             ->update(['estado' => $datos['estado']]);
+
+        // Actualización masiva: no dispara eventos de modelo, así que se
+        // registra aquí con la lista de afectados.
+        Auditoria::registrar('estudiante.estado_masivo', "Cambio masivo de estado a «{$datos['estado']}» en {$actualizados} estudiantes", [
+            'metadatos' => ['ids' => $datos['ids'], 'estado' => $datos['estado'], 'actualizados' => $actualizados],
+        ]);
 
         return response()->json(['actualizados' => $actualizados]);
     }
@@ -592,6 +599,12 @@ class EstudianteController extends Controller
         $anterior = $estudiante->estado_pago;
         $curso = $estudiante->curso;
 
+        Auditoria::registrar('estudiante.estado_pago_cambiado', "Estado de pago de {$estudiante->nombre}: {$anterior} → {$data['estado_pago']}", [
+            'entidad' => $estudiante,
+            'cambios' => ['antes' => ['estado_pago' => $anterior], 'despues' => ['estado_pago' => $data['estado_pago']]],
+            'metadatos' => ['curso_id' => $curso?->id],
+        ]);
+
         // El estado de pago es el del curso actual. Si deja de estar
         // aprobado, el estudiante sale del curso: antes seguía dentro con el
         // pago "reprobado" a la vista.
@@ -642,6 +655,12 @@ class EstudianteController extends Controller
             ! $curso->instructor ||
             (int) $curso->instructor->user_id !== (int) Auth::id()
         ) {
+            Auditoria::registrar('seguridad.acceso_denegado', "Intento de aprobar a {$estudiante->nombre} en un curso ajeno", [
+                'nivel' => 'aviso',
+                'entidad' => $estudiante,
+                'metadatos' => ['curso_id' => $cursoId],
+            ]);
+
             return response()->json(
                 ['message' => 'No autorizado para este curso.'],
                 403,
@@ -681,6 +700,17 @@ class EstudianteController extends Controller
 
         $nuevoEstado = $data['estado_aprobacion_curso'];
         $cambio = $curso->pivot->estado_aprobacion_curso !== $nuevoEstado;
+
+        if ($cambio) {
+            Auditoria::registrar('curso.aprobacion_estudiante', "Aprobación del curso «{$curso->nombre}» para {$estudiante->nombre}: {$curso->pivot->estado_aprobacion_curso} → {$nuevoEstado}", [
+                'entidad' => $estudiante,
+                'cambios' => [
+                    'antes' => ['estado_aprobacion_curso' => $curso->pivot->estado_aprobacion_curso],
+                    'despues' => ['estado_aprobacion_curso' => $nuevoEstado],
+                ],
+                'metadatos' => ['curso_id' => $curso->id],
+            ]);
+        }
 
         Inscripcion::where('estudiante_id', $estudiante->id)
             ->where('curso_id', $curso->id)

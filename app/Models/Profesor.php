@@ -2,12 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Profesor extends Model
 {
+    use Auditable;
+
+    protected string $auditEntidad = 'instructor';
+
+    protected string $auditNombre = 'instructor';
+
     use HasFactory, SoftDeletes;
 
     protected $table = 'profesores';

@@ -29,6 +29,11 @@ class CursoEstadoService
      */
     public static function sincronizar(): void
     {
+        Auditoria::comoSistema(fn () => self::aplicarSincronizacion());
+    }
+
+    private static function aplicarSincronizacion(): void
+    {
         $hoy = now()->toDateString();
 
         $vencidos = Curso::with('instructor.user')
@@ -39,6 +44,10 @@ class CursoEstadoService
 
         foreach ($vencidos as $curso) {
             $curso->update(['estado' => 'inactivo']);
+            Auditoria::registrar('curso.finalizado_automaticamente', "El curso «{$curso->nombre}» llegó a su fecha de fin y pasó a inactivo", [
+                'entidad' => $curso,
+                'metadatos' => ['fecha_fin' => $curso->fecha_fin?->toDateString()],
+            ]);
             self::notificar(
                 $curso,
                 'Curso Finalizado',
@@ -57,6 +66,11 @@ class CursoEstadoService
         foreach ($sinMinimo as $curso) {
             $inscritos = $curso->estudiantes()->count();
             $curso->update(['estado' => 'inactivo']);
+            Auditoria::registrar('curso.no_aperturado', "El curso «{$curso->nombre}» no alcanzó el mínimo de estudiantes y pasó a inactivo", [
+                'nivel' => 'aviso',
+                'entidad' => $curso,
+                'metadatos' => ['inscritos' => $inscritos, 'minimo' => $curso->minimo_estudiantes],
+            ]);
             self::notificar(
                 $curso,
                 'Curso sin mínimo de estudiantes',

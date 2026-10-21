@@ -63,6 +63,11 @@ class TemarioController extends Controller
 
         $temario->update($data);
 
+        // Las sesiones de este tema muestran su título: se mantienen al día.
+        if ($temario->wasChanged('titulo')) {
+            $temario->sesiones()->get()->each->update(['titulo' => $temario->titulo]);
+        }
+
         $this->notifyInstructor($cursoId, 'actualizado');
 
         return response()->json($temario);

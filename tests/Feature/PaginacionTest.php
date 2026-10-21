@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Curso;
 use App\Models\Estudiante;
+use App\Models\Pago;
 use App\Models\Profesor;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -352,5 +353,54 @@ class PaginacionTest extends TestCase
         $this->getJson('/api/me')
             ->assertOk()
             ->assertJsonCount(3, 'profesor.cursos');
+    }
+
+    private function pagos(Estudiante $estudiante, Curso $curso, int $n): void
+    {
+        for ($i = 0; $i < $n; $i++) {
+            $pago = Pago::create([
+                'user_id' => $estudiante->user_id,
+                'curso_id' => $curso->id,
+                'metodo_pago' => 'efectivo',
+                'referencia' => '',
+                'banco_origen' => '',
+                'comprobante' => '',
+                'estado' => 'rechazado',
+            ]);
+            $pago->created_at = now()->subDays($n - $i);
+            $pago->save();
+        }
+    }
+
+    public function test_pagos_del_admin_paginan_con_per_page_y_metadatos(): void
+    {
+        $this->actingAsAdmin();
+        $this->pagos(Estudiante::factory()->create(), Curso::factory()->create(), 23);
+
+        $this->getJson('/api/admin/pagos?per_page=10&page=3')
+            ->assertOk()
+            ->assertJsonPath('total', 23)
+            ->assertJsonPath('per_page', 10)
+            ->assertJsonPath('current_page', 3)
+            ->assertJsonPath('last_page', 3)
+            ->assertJsonCount(3, 'data');
+    }
+
+    public function test_pagos_del_estudiante_filtran_por_curso_del_mas_reciente_al_mas_antiguo(): void
+    {
+        $estudiante = Estudiante::factory()->create();
+        $curso = Curso::factory()->create();
+        $otro = Curso::factory()->create();
+        $this->pagos($estudiante, $otro, 12);
+        $this->pagos($estudiante, $curso, 2);
+
+        Sanctum::actingAs($estudiante->user);
+        $data = $this->getJson("/api/estudiante/pagos?curso_id={$curso->id}")
+            ->assertOk()
+            ->assertJsonPath('total', 2)
+            ->json('data');
+
+        $this->assertSame([$curso->id, $curso->id], array_column($data, 'curso_id'));
+        $this->assertTrue($data[0]['created_at'] > $data[1]['created_at']);
     }
 }
