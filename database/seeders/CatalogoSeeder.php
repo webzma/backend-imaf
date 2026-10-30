@@ -49,5 +49,13 @@ class CatalogoSeeder extends Seeder
                 ['nombre' => 'Doctorado', 'created_at' => now(), 'updated_at' => now()],
             ]);
         }
+
+        if (! DB::table('niveles_cursos')->count()) {
+            DB::table('niveles_cursos')->insert([
+                ['nombre' => 'Básico', 'created_at' => now(), 'updated_at' => now()],
+                ['nombre' => 'Intermedio', 'created_at' => now(), 'updated_at' => now()],
+                ['nombre' => 'Avanzado', 'created_at' => now(), 'updated_at' => now()],
+            ]);
+        }
     }
 }
