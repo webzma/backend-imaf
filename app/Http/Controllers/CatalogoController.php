@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Departamento;
 use App\Models\Especialidad;
+use App\Models\NivelCurso;
 use App\Models\TipoContrato;
 use App\Models\Titulo;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +21,15 @@ class CatalogoController extends Controller
         'departamentos' => Departamento::class,
         'titulos' => Titulo::class,
         'tipo-contratos' => TipoContrato::class,
+        'niveles-cursos' => NivelCurso::class,
+    ];
+
+    /**
+     * Relación con la que se cuenta el uso de cada catálogo. Los de
+     * instructores los usan `profesores`; el nivel de curso lo usan `cursos`.
+     */
+    private const RELACION_USO = [
+        'niveles-cursos' => 'cursos',
     ];
 
     /**
@@ -57,9 +67,11 @@ class CatalogoController extends Controller
     {
         $modelo = $this->modelo($slug);
 
-        // `profesores_count`: la pantalla avisa cuántos instructores lo usan
-        // antes de borrarlo (al borrar, el campo les queda vacío).
-        return response()->json($modelo::withCount('profesores')->orderBy('nombre')->get());
+        // `{relacion}_count`: la pantalla avisa cuántos registros usan la
+        // opción antes de borrarla (al borrar, el campo les queda vacío).
+        $relacion = self::RELACION_USO[$slug] ?? 'profesores';
+
+        return response()->json($modelo::withCount($relacion)->orderBy('nombre')->get());
     }
 
     /**

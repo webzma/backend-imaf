@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Curso;
 use App\Models\Especialidad;
+use App\Models\NivelCurso;
 use App\Models\Profesor;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -54,5 +56,27 @@ class CatalogoTest extends TestCase
             ->firstWhere('id', $especialidad->id);
 
         $this->assertSame(1, $item['profesores_count']);
+    }
+
+    public function test_puede_crear_y_listar_niveles_de_curso(): void
+    {
+        $this->postJson('/api/admin/niveles-cursos', ['nombre' => 'Avanzado'])
+            ->assertCreated()
+            ->assertJsonPath('nombre', 'Avanzado');
+
+        $this->getJson('/api/admin/niveles-cursos')
+            ->assertOk()
+            ->assertJsonFragment(['nombre' => 'Avanzado']);
+    }
+
+    public function test_el_catalogo_de_niveles_indica_cuantos_cursos_lo_usan(): void
+    {
+        $nivel = NivelCurso::create(['nombre' => 'Intermedio']);
+        Curso::factory()->create(['nivel_curso_id' => $nivel->id]);
+
+        $item = collect($this->getJson('/api/admin/niveles-cursos')->assertOk()->json())
+            ->firstWhere('id', $nivel->id);
+
+        $this->assertSame(1, $item['cursos_count']);
     }
 }

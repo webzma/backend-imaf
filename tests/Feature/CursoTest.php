@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Curso;
+use App\Models\NivelCurso;
 use App\Models\Profesor;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -202,5 +203,51 @@ class CursoTest extends TestCase
     public function test_usuario_no_autenticado_no_puede_acceder_a_cursos(): void
     {
         $this->getJson('/api/admin/cursos')->assertUnauthorized();
+    }
+
+    public function test_admin_puede_asignar_nivel_de_curso_al_crear(): void
+    {
+        Notification::fake();
+        $this->actingAsAdmin();
+        $profesor = Profesor::factory()->create();
+        $nivel = NivelCurso::create(['nombre' => 'Básico']);
+
+        $this->postJson('/api/admin/cursos', [
+            'profesor_id' => $profesor->id,
+            'nivel_curso_id' => $nivel->id,
+            'nombre' => 'Curso con nivel',
+            'limite_cupo' => 10,
+            'precio' => 0,
+        ])->assertCreated()->assertJsonPath('nivel_curso.nombre', 'Básico');
+
+        $this->assertDatabaseHas('cursos', [
+            'nombre' => 'Curso con nivel',
+            'nivel_curso_id' => $nivel->id,
+        ]);
+    }
+
+    public function test_crear_curso_rechaza_un_nivel_inexistente(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/admin/cursos', $this->payloadCurso([
+            'nivel_curso_id' => 9999,
+        ]))->assertStatus(422)->assertJsonValidationErrors('nivel_curso_id');
+    }
+
+    public function test_admin_puede_cambiar_el_nivel_de_un_curso(): void
+    {
+        $this->actingAsAdmin();
+        $curso = Curso::factory()->create();
+        $nivel = NivelCurso::create(['nombre' => 'Avanzado']);
+
+        $this->putJson("/api/admin/cursos/{$curso->id}", [
+            'nivel_curso_id' => $nivel->id,
+        ])->assertOk()->assertJsonPath('nivel_curso.nombre', 'Avanzado');
+
+        $this->assertDatabaseHas('cursos', [
+            'id' => $curso->id,
+            'nivel_curso_id' => $nivel->id,
+        ]);
     }
 }

@@ -30,6 +30,7 @@ class Curso extends Model
 
     protected $fillable = [
         'profesor_id',
+        'nivel_curso_id',
         'nombre',
         'limite_cupo',
         'minimo_estudiantes',
@@ -93,6 +94,11 @@ class Curso extends Model
     public function instructor()
     {
         return $this->belongsTo(Profesor::class, 'profesor_id');
+    }
+
+    public function nivelCurso()
+    {
+        return $this->belongsTo(NivelCurso::class, 'nivel_curso_id');
     }
 
     /**

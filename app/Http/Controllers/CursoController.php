@@ -30,7 +30,7 @@ class CursoController extends Controller
     {
         CursoEstadoService::sincronizarConCache();
 
-        $query = Curso::with('instructor.user', 'estudiantes.user');
+        $query = Curso::with('instructor.user', 'nivelCurso', 'estudiantes.user');
 
         if ($search = $this->terminoBusqueda($request)) {
             $query->where(function ($q) use ($search) {
@@ -73,7 +73,7 @@ class CursoController extends Controller
         CursoEstadoService::sincronizarConCache();
 
         return response()->json(
-            Curso::with('instructor.user', 'estudiantes.user')
+            Curso::with('instructor.user', 'nivelCurso', 'estudiantes.user')
                 ->where('estado', 'activo')
                 ->latest('id')
                 ->paginate($this->registrosPorPagina($request, self::MAX_PER_PAGE_CATALOGO))
@@ -101,6 +101,7 @@ class CursoController extends Controller
     {
         $data = $request->validate([
             'profesor_id' => ['required', Rule::exists('profesores', 'id')],
+            'nivel_curso_id' => ['nullable', Rule::exists('niveles_cursos', 'id')],
             'nombre' => 'required|string|max:255',
             'limite_cupo' => 'required|integer|min:1',
             'minimo_estudiantes' => 'nullable|integer|min:1|lte:limite_cupo',
@@ -125,12 +126,12 @@ class CursoController extends Controller
             ));
         }
 
-        return response()->json($curso->load('instructor'), 201);
+        return response()->json($curso->load('instructor', 'nivelCurso'), 201);
     }
 
     public function show(Request $request, string $id)
     {
-        $curso = Curso::with('instructor.user', 'temario', 'sesiones')->findOrFail($id);
+        $curso = Curso::with('instructor.user', 'nivelCurso', 'temario', 'sesiones')->findOrFail($id);
 
         // Admin e instructor ven el listado interno completo: también a
         // quien no ha pagado, está inactivo o fue archivado. El estudiante
@@ -243,6 +244,7 @@ class CursoController extends Controller
 
         $data = $request->validate([
             'profesor_id' => ['sometimes', Rule::exists('profesores', 'id')],
+            'nivel_curso_id' => ['nullable', Rule::exists('niveles_cursos', 'id')],
             'nombre' => 'sometimes|string|max:255',
             'limite_cupo' => 'sometimes|integer|min:1',
             'minimo_estudiantes' => 'nullable|integer|min:1',
@@ -292,7 +294,7 @@ class CursoController extends Controller
             }
         }
 
-        return response()->json($curso->load('instructor'));
+        return response()->json($curso->load('instructor', 'nivelCurso'));
     }
 
     public function destroy(string $id)
