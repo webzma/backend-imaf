@@ -16,7 +16,16 @@ class Estudiante extends Model
 
     protected string $auditNombre = 'estudiante';
 
+    /**
+     * La URL de la cédula es un dato sensible: se excluye de la bitácora y se
+     * oculta por defecto. Los endpoints autorizados la exponen con
+     * `makeVisible('foto_cedula')`.
+     */
+    protected array $auditExcluir = ['foto_cedula'];
+
     use HasFactory, SoftDeletes;
+
+    protected $hidden = ['foto_cedula'];
 
     protected $fillable = [
         'user_id',
@@ -30,6 +39,7 @@ class Estudiante extends Model
         'fecha_nacimiento',
         'genero',
         'foto',
+        'foto_cedula',
         'fecha_inscripcion',
         'estado',
         'estado_pago',

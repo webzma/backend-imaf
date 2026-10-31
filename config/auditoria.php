@@ -32,6 +32,7 @@ return [
         'token',
         'current_password',
         'secret',
+        'foto_cedula',
     ],
 
     /*

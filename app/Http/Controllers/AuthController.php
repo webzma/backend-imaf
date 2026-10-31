@@ -7,6 +7,7 @@ use App\Models\Estudiante;
 use App\Models\User;
 use App\Notifications\ResetPasswordNotification;
 use App\Services\Auditoria;
+use App\Services\CedulaEstudiante;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -70,8 +71,9 @@ class AuthController extends Controller
                 ],
                 'fecha_nacimiento' => 'required|date',
                 'genero' => 'required|in:masculino,femenino,otro',
+                'foto_cedula' => 'required|'.self::REGLAS_FOTO_CEDULA,
             ],
-            $this->mensajesTipoDato(),
+            array_merge($this->mensajesTipoDato(), $this->mensajesFotoCedula()),
         );
 
         $user = DB::transaction(function () use ($request) {
@@ -85,7 +87,7 @@ class AuthController extends Controller
                 'role' => 'estudiante',
             ]);
 
-            Estudiante::create([
+            $estudiante = Estudiante::create([
                 'user_id' => $user->id,
                 'nombre' => $user->name,
                 'nacionalidad' => $request->nacionalidad,
@@ -97,6 +99,13 @@ class AuthController extends Controller
                 'genero' => $request->genero,
                 'fecha_inscripcion' => now()->toDateString(),
                 'estado' => 'activo',
+            ]);
+
+            $estudiante->update([
+                'foto_cedula' => CedulaEstudiante::subir(
+                    $request->file('foto_cedula'),
+                    $estudiante->id,
+                ),
             ]);
 
             return $user;

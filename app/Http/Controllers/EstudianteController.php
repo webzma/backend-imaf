@@ -10,6 +10,7 @@ use App\Models\Sesion;
 use App\Models\User;
 use App\Notifications\SolicitudCursoProcesada;
 use App\Services\Auditoria;
+use App\Services\CedulaEstudiante;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -70,8 +71,16 @@ class EstudianteController extends Controller
 
         $this->aplicarOrden($query, $request, self::ORDEN_ESTUDIANTES, 'nombre');
 
+        // La cédula se oculta por defecto; solo el admin ve la imagen en su
+        // listado. Un profesor no debe poder abrir el documento de identidad.
+        $verCedula = $request->user()?->isAdmin() ?? false;
+
         return response()->json(
-            $query->paginate($this->registrosPorPagina($request)),
+            $query
+                ->paginate($this->registrosPorPagina($request))
+                ->through(fn (Estudiante $estudiante) => $verCedula
+                    ? $estudiante->makeVisible('foto_cedula')
+                    : $estudiante),
         );
     }
 
@@ -155,8 +164,9 @@ class EstudianteController extends Controller
                 'genero' => 'nullable|in:masculino,femenino,otro',
                 'fecha_inscripcion' => 'required|date',
                 'estado' => 'in:activo,inactivo,graduado',
+                'foto_cedula' => 'required|'.self::REGLAS_FOTO_CEDULA,
             ],
-            $this->mensajesTipoDato(),
+            array_merge($this->mensajesTipoDato(), $this->mensajesFotoCedula()),
         );
 
         $estudiante = DB::transaction(function () use ($request) {
@@ -170,7 +180,7 @@ class EstudianteController extends Controller
                 'role' => 'estudiante',
             ]);
 
-            return Estudiante::create([
+            $estudiante = Estudiante::create([
                 'user_id' => $user->id,
                 'curso_id' => $request->curso_id,
                 'nombre' => $user->name,
@@ -184,9 +194,21 @@ class EstudianteController extends Controller
                 'fecha_inscripcion' => $request->fecha_inscripcion,
                 'estado' => $request->estado ?? 'activo',
             ]);
+
+            $estudiante->update([
+                'foto_cedula' => CedulaEstudiante::subir(
+                    $request->file('foto_cedula'),
+                    $estudiante->id,
+                ),
+            ]);
+
+            return $estudiante;
         });
 
-        return response()->json($estudiante->load('user', 'curso'), 201);
+        return response()->json(
+            $estudiante->load('user', 'curso')->makeVisible('foto_cedula'),
+            201,
+        );
     }
 
     /**
@@ -227,7 +249,7 @@ class EstudianteController extends Controller
             $estudiante->setRelation('curso', null);
         }
 
-        return response()->json($estudiante);
+        return response()->json($estudiante->makeVisible('foto_cedula'));
     }
 
     /**
@@ -397,7 +419,9 @@ class EstudianteController extends Controller
         $estudiante->update($data);
         $estudiante->refresh();
 
-        return response()->json($estudiante->load('user', 'curso'));
+        return response()->json(
+            $estudiante->load('user', 'curso')->makeVisible('foto_cedula'),
+        );
     }
 
     public function uploadFotoMe(Request $request)
@@ -440,7 +464,34 @@ class EstudianteController extends Controller
         $estudiante->update(['foto' => $upload['secure_url']]);
         $estudiante->refresh();
 
-        return response()->json($estudiante->load('user', 'curso'));
+        return response()->json(
+            $estudiante->load('user', 'curso')->makeVisible('foto_cedula'),
+        );
+    }
+
+    /**
+     * El estudiante reemplaza la imagen de su cédula desde su perfil.
+     */
+    public function uploadCedulaMe(Request $request)
+    {
+        $request->validate(
+            ['foto_cedula' => 'required|'.self::REGLAS_FOTO_CEDULA],
+            $this->mensajesFotoCedula(),
+        );
+
+        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+
+        $estudiante->update([
+            'foto_cedula' => CedulaEstudiante::subir(
+                $request->file('foto_cedula'),
+                $estudiante->id,
+            ),
+        ]);
+        $estudiante->refresh();
+
+        return response()->json(
+            $estudiante->load('user', 'curso')->makeVisible('foto_cedula'),
+        );
     }
 
     public function show(Request $request, string $id)
@@ -450,6 +501,10 @@ class EstudianteController extends Controller
         $this->acotarAlProfesor($query, $request->user());
 
         $estudiante = $query->findOrFail($id);
+
+        if ($request->user()?->isAdmin()) {
+            $estudiante->makeVisible('foto_cedula');
+        }
 
         return response()->json($estudiante);
     }
@@ -539,9 +594,19 @@ class EstudianteController extends Controller
                 'genero' => 'nullable|in:masculino,femenino,otro',
                 'fecha_inscripcion' => 'sometimes|date',
                 'estado' => 'in:activo,inactivo,graduado',
+                'foto_cedula' => 'nullable|'.self::REGLAS_FOTO_CEDULA,
             ],
-            $this->mensajesTipoDato(),
+            array_merge($this->mensajesTipoDato(), $this->mensajesFotoCedula()),
         );
+
+        if ($request->hasFile('foto_cedula')) {
+            $data['foto_cedula'] = CedulaEstudiante::subir(
+                $request->file('foto_cedula'),
+                $estudiante->id,
+            );
+        } else {
+            unset($data['foto_cedula']);
+        }
 
         $estudiante->load('user');
 
@@ -573,7 +638,9 @@ class EstudianteController extends Controller
             ),
         );
 
-        return response()->json($estudiante->load('user', 'curso'));
+        return response()->json(
+            $estudiante->load('user', 'curso')->makeVisible('foto_cedula'),
+        );
     }
 
     public function destroy(string $id)

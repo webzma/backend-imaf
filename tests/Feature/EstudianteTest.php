@@ -8,7 +8,10 @@ use App\Models\Estudiante;
 use App\Models\Profesor;
 use App\Models\Sesion;
 use App\Models\User;
+use Cloudinary\Api\ApiResponse;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -24,6 +27,13 @@ class EstudianteTest extends TestCase
         return $admin;
     }
 
+    private function mockCloudinaryUpload(): void
+    {
+        Cloudinary::shouldReceive('uploadApi->upload')->andReturn(
+            new ApiResponse(['secure_url' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg'], [])
+        );
+    }
+
     public function test_admin_puede_listar_estudiantes_paginados(): void
     {
         $this->actingAsAdmin();
@@ -37,8 +47,9 @@ class EstudianteTest extends TestCase
     public function test_admin_puede_crear_estudiante_con_su_usuario(): void
     {
         $this->actingAsAdmin();
+        $this->mockCloudinaryUpload();
 
-        $response = $this->postJson('/api/admin/estudiantes', [
+        $response = $this->post('/api/admin/estudiantes', [
             'primer_nombre' => 'María',
             'segundo_nombre' => 'Elena',
             'primer_apellido' => 'López',
@@ -51,12 +62,14 @@ class EstudianteTest extends TestCase
             'direccion' => 'Calle Las Carreras #12',
             'fecha_inscripcion' => '2026-06-01',
             'estado' => 'activo',
-        ]);
+            'foto_cedula' => UploadedFile::fake()->image('cedula.jpg'),
+        ], ['Accept' => 'application/json']);
 
         $response->assertCreated()
             ->assertJsonFragment(['nombre' => 'María Elena López Gómez'])
             ->assertJsonFragment(['primer_nombre' => 'María', 'segundo_apellido' => 'Gómez'])
-            ->assertJsonFragment(['municipio' => 'Santiago', 'direccion' => 'Calle Las Carreras #12']);
+            ->assertJsonFragment(['municipio' => 'Santiago', 'direccion' => 'Calle Las Carreras #12'])
+            ->assertJsonFragment(['foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg']);
 
         $this->assertDatabaseHas('users', [
             'email' => 'maria@example.com',
@@ -67,7 +80,107 @@ class EstudianteTest extends TestCase
             'municipio' => 'Santiago',
             'direccion' => 'Calle Las Carreras #12',
             'estado' => 'activo',
+            'foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg',
         ]);
+    }
+
+    public function test_admin_no_puede_crear_estudiante_sin_imagen_de_cedula(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/admin/estudiantes', [
+            'primer_nombre' => 'María',
+            'primer_apellido' => 'López',
+            'segundo_apellido' => 'Gómez',
+            'email' => 'maria@example.com',
+            'password' => 'password123',
+            'nacionalidad' => 'V',
+            'cedula' => '22222222',
+            'municipio' => 'Santiago',
+            'direccion' => 'Calle Las Carreras #12',
+            'fecha_inscripcion' => '2026-06-01',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('foto_cedula');
+    }
+
+    public function test_estudiante_puede_actualizar_la_imagen_de_su_cedula(): void
+    {
+        $estudiante = Estudiante::factory()->create([
+            'foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/vieja.jpg',
+        ]);
+        Sanctum::actingAs($estudiante->user);
+        $this->mockCloudinaryUpload();
+
+        $this->post('/api/estudiante/perfil/cedula', [
+            'foto_cedula' => UploadedFile::fake()->image('nueva.jpg'),
+        ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonFragment(['foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg']);
+
+        $this->assertDatabaseHas('estudiantes', [
+            'id' => $estudiante->id,
+            'foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg',
+        ]);
+    }
+
+    public function test_admin_puede_reemplazar_la_imagen_de_la_cedula(): void
+    {
+        $this->actingAsAdmin();
+        $this->mockCloudinaryUpload();
+        $estudiante = Estudiante::factory()->create([
+            'foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/vieja.jpg',
+            'municipio' => 'Santiago',
+            'direccion' => 'Calle 1',
+        ]);
+
+        // El panel envía `POST` con `_method=PUT` porque `PUT` no transporta
+        // archivos en PHP.
+        $this->post("/api/admin/estudiantes/{$estudiante->id}", [
+            '_method' => 'PUT',
+            'municipio' => 'Santiago',
+            'direccion' => 'Calle 1',
+            'foto_cedula' => UploadedFile::fake()->image('nueva.jpg'),
+        ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonFragment(['foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg']);
+
+        $this->assertDatabaseHas('estudiantes', [
+            'id' => $estudiante->id,
+            'foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg',
+        ]);
+    }
+
+    public function test_admin_puede_editar_sin_reemplazar_la_imagen_de_la_cedula(): void
+    {
+        $this->actingAsAdmin();
+        $estudiante = Estudiante::factory()->create([
+            'foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/vieja.jpg',
+            'municipio' => 'Santiago',
+            'direccion' => 'Calle 1',
+        ]);
+
+        $this->putJson("/api/admin/estudiantes/{$estudiante->id}", [
+            'municipio' => 'La Vega',
+            'direccion' => 'Calle 2',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('estudiantes', [
+            'id' => $estudiante->id,
+            'municipio' => 'La Vega',
+            'foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/vieja.jpg',
+        ]);
+    }
+
+    public function test_el_perfil_del_estudiante_expone_su_imagen_de_cedula(): void
+    {
+        $estudiante = Estudiante::factory()->create([
+            'foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg',
+        ]);
+        Sanctum::actingAs($estudiante->user);
+
+        $this->getJson('/api/estudiante/perfil')
+            ->assertOk()
+            ->assertJsonFragment(['foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg']);
     }
 
     public function test_crear_estudiante_falla_con_cedula_duplicada(): void

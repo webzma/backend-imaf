@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Cloudinary\Api\ApiResponse;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -11,9 +14,25 @@ class AuthTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function mockCloudinaryUpload(): void
+    {
+        Cloudinary::shouldReceive('uploadApi->upload')->andReturn(
+            new ApiResponse(['secure_url' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg'], [])
+        );
+    }
+
+    private function postRegistro(array $datos)
+    {
+        return $this->post('/api/register', array_merge($datos, [
+            'foto_cedula' => UploadedFile::fake()->image('cedula.jpg'),
+        ]), ['Accept' => 'application/json']);
+    }
+
     public function test_register_crea_usuario_estudiante_y_devuelve_token(): void
     {
-        $response = $this->postJson('/api/register', [
+        $this->mockCloudinaryUpload();
+
+        $response = $this->postRegistro([
             'primer_nombre' => 'Juan',
             'segundo_nombre' => 'Pablo',
             'primer_apellido' => 'Pérez',
@@ -45,12 +64,39 @@ class AuthTest extends TestCase
             'municipio' => 'Santo Domingo',
             'direccion' => 'Calle 5, Ensanche La Paz',
             'estado' => 'activo',
+            'foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg',
         ]);
+    }
+
+    public function test_register_exige_imagen_de_la_cedula(): void
+    {
+        $response = $this->post('/api/register', [
+            'primer_nombre' => 'Juan',
+            'segundo_nombre' => 'Pablo',
+            'primer_apellido' => 'Pérez',
+            'segundo_apellido' => 'Gómez',
+            'email' => 'juan@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'nacionalidad' => 'V',
+            'cedula' => '00123456',
+            'telefono' => '8090000000',
+            'municipio' => 'Santo Domingo',
+            'direccion' => 'Calle 5, Ensanche La Paz',
+            'fecha_nacimiento' => '2000-01-15',
+            'genero' => 'masculino',
+        ], ['Accept' => 'application/json']);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors('foto_cedula')
+            ->assertJsonFragment(['Debes adjuntar una imagen de la cédula.']);
     }
 
     public function test_register_acepta_cedula_de_7_u_8_digitos(): void
     {
-        $response = $this->postJson('/api/register', [
+        $this->mockCloudinaryUpload();
+
+        $response = $this->postRegistro([
             'primer_nombre' => 'Juan',
             'primer_apellido' => 'Pérez',
             'segundo_apellido' => 'Gómez',
@@ -70,7 +116,7 @@ class AuthTest extends TestCase
 
     public function test_register_rechaza_cedula_con_mas_de_8_digitos(): void
     {
-        $response = $this->postJson('/api/register', [
+        $response = $this->postRegistro([
             'primer_nombre' => 'Juan',
             'primer_apellido' => 'Pérez',
             'segundo_apellido' => 'Gómez',
@@ -94,7 +140,7 @@ class AuthTest extends TestCase
     {
         User::factory()->create(['email' => 'dup@example.com']);
 
-        $response = $this->postJson('/api/register', [
+        $response = $this->postRegistro([
             'primer_nombre' => 'Otro',
             'primer_apellido' => 'Apellido',
             'segundo_apellido' => 'Apellido',
