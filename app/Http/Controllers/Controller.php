@@ -22,6 +22,9 @@ abstract class Controller
     /** Dirección: cualquier carácter excepto comillas, backticks, punto y coma y backslash. */
     public const REGEX_DIRECCION = 'regex:/^[^\'"`;\\\\]+$/u';
 
+    /** Reglas comunes para la imagen de la cédula (JPG, PNG o WEBP, hasta 5 MB). */
+    public const REGLAS_FOTO_CEDULA = 'image|mimes:jpeg,jpg,png,webp|max:5120';
+
     /** Tope máximo de registros por página. */
     public const MAX_PER_PAGE = 1000;
 
@@ -63,6 +66,19 @@ abstract class Controller
             'cedula.regex' => 'La cédula debe tener 7 u 8 dígitos numéricos.',
             'telefono.regex' => 'El teléfono solo puede contener dígitos numéricos.',
             'direccion.regex' => 'La dirección contiene caracteres no permitidos.',
+        ];
+    }
+
+    /**
+     * Mensajes en español para la imagen de la cédula de identidad.
+     */
+    protected function mensajesFotoCedula(): array
+    {
+        return [
+            'foto_cedula.required' => 'Debes adjuntar una imagen de la cédula.',
+            'foto_cedula.image' => 'La cédula debe ser una imagen.',
+            'foto_cedula.mimes' => 'La cédula debe ser una imagen JPG, PNG o WEBP.',
+            'foto_cedula.max' => 'La imagen de la cédula no debe superar los 5 MB.',
         ];
     }
 

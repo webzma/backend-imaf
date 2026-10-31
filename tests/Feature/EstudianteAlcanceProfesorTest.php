@@ -73,6 +73,20 @@ class EstudianteAlcanceProfesorTest extends TestCase
             ->assertJsonFragment(['id' => $propio->id]);
     }
 
+    public function test_profesor_no_ve_la_imagen_de_la_cedula(): void
+    {
+        [$profesor, , $propio] = $this->profesorConAlumno();
+        $propio->update(['foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/estudiante.jpg']);
+
+        Sanctum::actingAs($profesor->user);
+
+        $listado = $this->getJson('/api/estudiantes')->assertOk();
+        $detalle = $this->getJson("/api/estudiantes/{$propio->id}")->assertOk();
+
+        $this->assertArrayNotHasKey('foto_cedula', $listado->json('data.0'));
+        $this->assertArrayNotHasKey('foto_cedula', $detalle->json());
+    }
+
     public function test_profesor_no_puede_ver_el_detalle_de_un_estudiante_ajeno(): void
     {
         [$profesor] = $this->profesorConAlumno();
@@ -88,24 +102,33 @@ class EstudianteAlcanceProfesorTest extends TestCase
         [, , $unoA] = $this->profesorConAlumno();
         [, , $unoB] = $this->profesorConAlumno();
         $sinCurso = Estudiante::factory()->create(['curso_id' => null]);
+        $unoA->update(['foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/uno-a.jpg']);
 
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
 
-        $ids = array_column($this->getJson('/api/estudiantes')->assertOk()->json('data'), 'id');
+        $data = $this->getJson('/api/estudiantes')->assertOk()->json('data');
+        $ids = array_column($data, 'id');
 
         $this->assertContains($unoA->id, $ids);
         $this->assertContains($unoB->id, $ids);
         $this->assertContains($sinCurso->id, $ids);
+
+        $fila = collect($data)->firstWhere('id', $unoA->id);
+        $this->assertSame('https://res.cloudinary.com/imaf/cedulas/uno-a.jpg', $fila['foto_cedula']);
     }
 
     public function test_admin_ve_el_detalle_de_cualquier_estudiante(): void
     {
         [, , $estudiante] = $this->profesorConAlumno();
+        $estudiante->update(['foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/detalle.jpg']);
 
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));
 
         $this->getJson("/api/admin/estudiantes/{$estudiante->id}")
             ->assertOk()
-            ->assertJsonFragment(['id' => $estudiante->id]);
+            ->assertJsonFragment([
+                'id' => $estudiante->id,
+                'foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/detalle.jpg',
+            ]);
     }
 }

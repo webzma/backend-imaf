@@ -292,6 +292,10 @@ Route::middleware('auth:sanctum')->group(function () {
                 EstudianteController::class,
                 'uploadFotoMe',
             ]);
+            Route::post('perfil/cedula', [
+                EstudianteController::class,
+                'uploadCedulaMe',
+            ]);
             Route::get('notificaciones', [
                 NotificationController::class,
                 'index',
