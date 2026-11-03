@@ -267,18 +267,6 @@ class CursoController extends Controller
 
         $oldProfesorId = $curso->profesor_id;
         $oldEstado = $curso->estado;
-
-        // Si cambian las condiciones que generan la alerta de mínimo, se
-        // vuelve a evaluar en la próxima sincronización.
-        $cambioFechaInicio = array_key_exists('fecha_inicio', $data)
-            && $data['fecha_inicio'] !== $curso->fecha_inicio?->toDateString();
-        $cambioMinimo = array_key_exists('minimo_estudiantes', $data)
-            && (int) $data['minimo_estudiantes'] !== (int) $curso->minimo_estudiantes;
-
-        if ($cambioFechaInicio || $cambioMinimo) {
-            $data['minimo_alertado_en'] = null;
-        }
-
         $curso->update($data);
 
         // Notificar al profesor si el estado del curso cambió

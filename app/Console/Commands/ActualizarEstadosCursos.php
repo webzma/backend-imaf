@@ -9,7 +9,7 @@ class ActualizarEstadosCursos extends Command
 {
     protected $signature = 'cursos:actualizar-estados';
 
-    protected $description = 'Inactiva cursos vencidos y alerta sobre cursos que llegan a su fecha de inicio sin el mínimo de estudiantes';
+    protected $description = 'Inactiva cursos vencidos y cursos que llegan a su fecha de inicio sin el mínimo de estudiantes';
 
     public function handle(): int
     {
