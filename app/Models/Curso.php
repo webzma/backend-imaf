@@ -16,6 +16,9 @@ class Curso extends Model
 
     protected string $auditNombre = 'curso';
 
+    /** Marca interna de la alerta de mínimo; tiene su propio evento. */
+    protected array $auditExcluir = ['minimo_alertado_en'];
+
     use HasFactory, SoftDeletes;
 
     /**
@@ -34,6 +37,7 @@ class Curso extends Model
         'nombre',
         'limite_cupo',
         'minimo_estudiantes',
+        'minimo_alertado_en',
         'fecha_inicio',
         'fecha_fin',
         'descripcion',
@@ -45,9 +49,12 @@ class Curso extends Model
 
     protected $appends = ['cupos_restantes', 'modalidad', 'sede'];
 
+    protected $hidden = ['minimo_alertado_en'];
+
     protected $casts = [
         'fecha_inicio' => 'date:Y-m-d',
         'fecha_fin' => 'date:Y-m-d',
+        'minimo_alertado_en' => 'datetime',
     ];
 
     protected static function boot(): void

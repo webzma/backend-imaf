@@ -25,7 +25,8 @@ class CursoEstadoService
      *
      * - Un curso activo cuya fecha de culminación ya llegó pasa a "inactivo" (MY-102).
      * - Un curso activo que alcanza su fecha de inicio sin el mínimo de
-     *   estudiantes inscritos pasa a "inactivo" y se alerta al admin (MY-103).
+     *   estudiantes inscritos se alerta una sola vez (MY-103), pero conserva
+     *   el estado que haya decidido el admin.
      */
     public static function sincronizar(): void
     {
@@ -55,18 +56,23 @@ class CursoEstadoService
             );
         }
 
+        // El mínimo es solo un aviso: el estado del curso lo decide el admin.
+        // Sin esta condición, cada sincronización volvía a inactivar el curso
+        // aunque el admin lo hubiera reactivado (el listado la ejecuta cada
+        // 10 minutos).
         $sinMinimo = Curso::with('instructor.user')
             ->where('estado', 'activo')
             ->whereNotNull('fecha_inicio')
             ->whereDate('fecha_inicio', '<=', $hoy)
             ->whereNotNull('minimo_estudiantes')
+            ->whereNull('minimo_alertado_en')
             ->get()
             ->filter(fn (Curso $c) => $c->estudiantes()->count() < $c->minimo_estudiantes);
 
         foreach ($sinMinimo as $curso) {
             $inscritos = $curso->estudiantes()->count();
-            $curso->update(['estado' => 'inactivo']);
-            Auditoria::registrar('curso.no_aperturado', "El curso «{$curso->nombre}» no alcanzó el mínimo de estudiantes y pasó a inactivo", [
+            $curso->update(['minimo_alertado_en' => now()]);
+            Auditoria::registrar('curso.no_aperturado', "El curso «{$curso->nombre}» no alcanzó el mínimo de estudiantes y se mantiene activo a la espera de la decisión del admin", [
                 'nivel' => 'aviso',
                 'entidad' => $curso,
                 'metadatos' => ['inscritos' => $inscritos, 'minimo' => $curso->minimo_estudiantes],
@@ -75,7 +81,7 @@ class CursoEstadoService
                 $curso,
                 'Curso sin mínimo de estudiantes',
                 "El curso '{$curso->nombre}' llegó a su fecha de inicio con {$inscritos} inscritos "
-                ."(mínimo requerido: {$curso->minimo_estudiantes}) y no fue aperturado.",
+                ."(mínimo requerido: {$curso->minimo_estudiantes}). Se mantiene activo; revisa si deseas inactivarlo.",
             );
         }
     }
