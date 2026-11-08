@@ -28,7 +28,7 @@ class EstudianteAlcanceProfesorTest extends TestCase
     {
         $profesor = Profesor::factory()->create();
         $curso = Curso::factory()->create(['profesor_id' => $profesor->id]);
-        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
 
         return [$profesor, $curso, $estudiante];
     }
@@ -53,7 +53,7 @@ class EstudianteAlcanceProfesorTest extends TestCase
     {
         $profesor = Profesor::factory()->create();
         Curso::factory()->create(['profesor_id' => $profesor->id]);
-        $sinCurso = Estudiante::factory()->create(['curso_id' => null]);
+        $sinCurso = Estudiante::factory()->create();
 
         Sanctum::actingAs($profesor->user);
 
@@ -101,7 +101,7 @@ class EstudianteAlcanceProfesorTest extends TestCase
     {
         [, , $unoA] = $this->profesorConAlumno();
         [, , $unoB] = $this->profesorConAlumno();
-        $sinCurso = Estudiante::factory()->create(['curso_id' => null]);
+        $sinCurso = Estudiante::factory()->create();
         $unoA->update(['foto_cedula' => 'https://res.cloudinary.com/imaf/cedulas/uno-a.jpg']);
 
         Sanctum::actingAs(User::factory()->create(['role' => 'admin']));

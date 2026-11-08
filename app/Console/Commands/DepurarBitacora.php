@@ -31,8 +31,8 @@ class DepurarBitacora extends Command
 
         // Por lotes, para no bloquear la tabla con un único DELETE enorme.
         do {
-            $ids = DB::table('bitacora')->where('created_at', '<', $limite)->limit(1000)->pluck('id');
-            $borrados += $ids->isEmpty() ? 0 : DB::table('bitacora')->whereIn('id', $ids)->delete();
+            $ids = DB::table('bitacoras')->where('created_at', '<', $limite)->limit(1000)->pluck('id');
+            $borrados += $ids->isEmpty() ? 0 : DB::table('bitacoras')->whereIn('id', $ids)->delete();
         } while ($ids->isNotEmpty());
 
         Auditoria::registrar('bitacora.depurada', "Depuración de la bitácora: {$borrados} registros anteriores a {$limite->toDateString()}", [

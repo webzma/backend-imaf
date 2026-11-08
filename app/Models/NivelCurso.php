@@ -13,7 +13,7 @@ class NivelCurso extends Model
 
     protected string $auditNombre = 'nivel de curso';
 
-    protected $table = 'niveles_cursos';
+    protected $table = 'niveles_curso';
 
     protected $fillable = [
         'nombre',

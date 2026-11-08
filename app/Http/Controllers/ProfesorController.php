@@ -127,7 +127,7 @@ class ProfesorController extends Controller
             'departamento_id' => 'required|exists:departamentos,id',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
-            'tipo_contrato_id' => 'required|exists:tipo_contratos,id',
+            'tipo_contrato_id' => 'required|exists:tipos_contrato,id',
         ], $this->mensajesTipoDato());
 
         $profesor = DB::transaction(function () use ($request) {
@@ -188,7 +188,7 @@ class ProfesorController extends Controller
             'departamento_id' => 'nullable|exists:departamentos,id',
             'fecha_nacimiento' => 'nullable|date',
             'genero' => 'nullable|in:masculino,femenino,otro',
-            'tipo_contrato_id' => 'sometimes|exists:tipo_contratos,id',
+            'tipo_contrato_id' => 'sometimes|exists:tipos_contrato,id',
         ];
 
         if ($isAdmin) {

@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Curso;
 use App\Models\Estudiante;
-use App\Models\Pago;
 use App\Models\Profesor;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,8 +24,7 @@ class ReporteTest extends TestCase
 
         // Más de una página: la pantalla calculaba estos totales sobre los 10
         // primeros registros que le llegaban.
-        Estudiante::factory()->count(14)->create([
-            'curso_id' => $curso->id,
+        Estudiante::factory()->count(14)->enCurso($curso->id)->create([
             'estado' => 'activo',
         ]);
         Estudiante::factory()->count(2)->create(['estado' => 'graduado']);
@@ -54,7 +52,7 @@ class ReporteTest extends TestCase
 
     private function pago(Curso $curso, string $estado, string $fecha, string $metodo = 'efectivo'): void
     {
-        $pago = Pago::create([
+        $pago = $this->registrarPago([
             'user_id' => Estudiante::factory()->create()->user_id,
             'curso_id' => $curso->id,
             'metodo_pago' => $metodo,

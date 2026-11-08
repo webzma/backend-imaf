@@ -33,7 +33,7 @@ class AccionesMasivasTest extends TestCase
         $user = User::factory()->create(['role' => 'estudiante']);
         Estudiante::factory()->create(['user_id' => $user->id]);
 
-        return Pago::create([
+        return $this->registrarPago([
             'user_id' => $user->id,
             'curso_id' => $curso->id,
             'metodo_pago' => 'pago_movil',
@@ -65,7 +65,7 @@ class AccionesMasivasTest extends TestCase
 
         $conCupo = Curso::factory()->create(['limite_cupo' => 30]);
         $lleno = Curso::factory()->create(['limite_cupo' => 1]);
-        Estudiante::factory()->create(['curso_id' => $lleno->id]);
+        Estudiante::factory()->enCurso($lleno->id)->create();
 
         $ok = $this->crearPago($conCupo);
         $sinCupo = $this->crearPago($lleno);

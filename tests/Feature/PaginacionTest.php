@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Curso;
 use App\Models\Estudiante;
-use App\Models\Pago;
 use App\Models\Profesor;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -358,7 +357,7 @@ class PaginacionTest extends TestCase
     private function pagos(Estudiante $estudiante, Curso $curso, int $n): void
     {
         for ($i = 0; $i < $n; $i++) {
-            $pago = Pago::create([
+            $pago = $this->registrarPago([
                 'user_id' => $estudiante->user_id,
                 'curso_id' => $curso->id,
                 'metodo_pago' => 'efectivo',

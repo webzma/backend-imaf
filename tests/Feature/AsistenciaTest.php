@@ -32,7 +32,7 @@ class AsistenciaTest extends TestCase
         Sanctum::actingAs($admin);
 
         $sesion = $this->crearSesionConCurso();
-        Estudiante::factory()->create(['curso_id' => $sesion->curso_id]);
+        Estudiante::factory()->enCurso($sesion->curso_id)->create();
 
         $this->getJson("/api/sesiones/{$sesion->id}/asistencia")
             ->assertOk()
@@ -51,7 +51,7 @@ class AsistenciaTest extends TestCase
             'titulo' => 'Sesión del profe',
             'fecha' => '2026-07-11',
         ]);
-        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
 
         Sanctum::actingAs($profesor->user);
 

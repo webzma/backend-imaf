@@ -117,6 +117,7 @@ class Curso extends Model
     public function matriculas()
     {
         return $this->belongsToMany(Estudiante::class, 'inscripciones')
+            ->wherePivotNull('deleted_at')
             ->withPivot('estado_pago', 'estado_aprobacion_curso', 'fecha_inscripcion')
             ->withTimestamps();
     }

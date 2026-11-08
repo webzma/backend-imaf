@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Curso;
 use App\Models\Estudiante;
-use App\Models\Pago;
 use App\Models\Profesor;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,8 +73,8 @@ class ListadoAdminTest extends TestCase
         $this->actingAsAdmin();
         $curso = Curso::factory()->create();
 
-        Estudiante::factory()->count(2)->create(['curso_id' => $curso->id]);
-        Estudiante::factory()->count(3)->create(['curso_id' => null]);
+        Estudiante::factory()->count(2)->enCurso($curso->id)->create();
+        Estudiante::factory()->count(3)->create();
 
         $res = $this->getJson('/api/admin/estudiantes?curso_id=sin_curso')->assertOk();
 
@@ -175,7 +174,7 @@ class ListadoAdminTest extends TestCase
 
         $curso = Curso::factory()->create(['estado' => 'activo']);
         Curso::factory()->create(['estado' => 'inactivo']);
-        Estudiante::factory()->count(2)->create(['curso_id' => $curso->id]);
+        Estudiante::factory()->count(2)->enCurso($curso->id)->create();
 
         $this->getJson('/api/admin/cursos/resumen')
             ->assertOk()
@@ -195,10 +194,10 @@ class ListadoAdminTest extends TestCase
 
         $curso = Curso::factory()->create();
         $user = User::factory()->create(['role' => 'estudiante']);
-        Estudiante::factory()->create(['user_id' => $user->id, 'curso_id' => $curso->id]);
+        Estudiante::factory()->enCurso($curso->id)->create(['user_id' => $user->id]);
 
         for ($i = 0; $i < 25; $i++) {
-            Pago::create([
+            $this->registrarPago([
                 'user_id' => $user->id,
                 'curso_id' => $curso->id,
                 'metodo_pago' => 'pago_movil',
@@ -220,13 +219,13 @@ class ListadoAdminTest extends TestCase
 
         $curso = Curso::factory()->create();
         $user = User::factory()->create(['role' => 'estudiante']);
-        Estudiante::factory()->create(['user_id' => $user->id, 'curso_id' => $curso->id]);
+        Estudiante::factory()->enCurso($curso->id)->create(['user_id' => $user->id]);
 
         $base = ['user_id' => $user->id, 'curso_id' => $curso->id, 'metodo_pago' => 'pago_movil'];
 
-        Pago::create($base + ['referencia' => '111', 'estado' => 'aprobado']);
-        $pendiente = Pago::create($base + ['referencia' => '222', 'estado' => 'pendiente']);
-        Pago::create($base + ['referencia' => '333', 'estado' => 'rechazado']);
+        $this->registrarPago($base + ['referencia' => '111', 'estado' => 'aprobado']);
+        $pendiente = $this->registrarPago($base + ['referencia' => '222', 'estado' => 'pendiente']);
+        $this->registrarPago($base + ['referencia' => '333', 'estado' => 'rechazado']);
 
         $res = $this->getJson('/api/admin/pagos')->assertOk();
 
@@ -239,12 +238,12 @@ class ListadoAdminTest extends TestCase
 
         $curso = Curso::factory()->create();
         $user = User::factory()->create(['role' => 'estudiante']);
-        Estudiante::factory()->create(['user_id' => $user->id, 'curso_id' => $curso->id]);
+        Estudiante::factory()->enCurso($curso->id)->create(['user_id' => $user->id]);
         $base = ['user_id' => $user->id, 'curso_id' => $curso->id, 'metodo_pago' => 'pago_movil'];
 
-        Pago::create($base + ['referencia' => '1', 'estado' => 'pendiente']);
-        Pago::create($base + ['referencia' => '2', 'estado' => 'pendiente']);
-        Pago::create($base + ['referencia' => '3', 'estado' => 'aprobado']);
+        $this->registrarPago($base + ['referencia' => '1', 'estado' => 'pendiente']);
+        $this->registrarPago($base + ['referencia' => '2', 'estado' => 'pendiente']);
+        $this->registrarPago($base + ['referencia' => '3', 'estado' => 'aprobado']);
 
         $this->getJson('/api/admin/pagos/resumen')
             ->assertOk()

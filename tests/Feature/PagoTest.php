@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Curso;
 use App\Models\Estudiante;
+use App\Models\Inscripcion;
 use Cloudinary\Api\ApiResponse;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -48,7 +49,7 @@ class PagoTest extends TestCase
 
         $response->assertCreated();
         $this->assertDatabaseHas('pagos', [
-            'curso_id' => $curso->id,
+            'inscripcion_id' => Inscripcion::where('curso_id', $curso->id)->value('id'),
             'metodo_pago' => 'pago_movil',
             'referencia' => '123456789',
             'estado' => 'pendiente',
@@ -68,7 +69,7 @@ class PagoTest extends TestCase
         ], ['Accept' => 'application/json'])->assertCreated();
 
         $this->assertDatabaseHas('pagos', [
-            'curso_id' => $curso->id,
+            'inscripcion_id' => Inscripcion::where('curso_id', $curso->id)->value('id'),
             'metodo_pago' => 'transferencia',
             'estado' => 'pendiente',
         ]);
@@ -84,7 +85,7 @@ class PagoTest extends TestCase
         ])->assertCreated();
 
         $this->assertDatabaseHas('pagos', [
-            'curso_id' => $curso->id,
+            'inscripcion_id' => Inscripcion::where('curso_id', $curso->id)->value('id'),
             'metodo_pago' => 'efectivo',
             'referencia' => null,
             'comprobante' => null,

@@ -25,4 +25,13 @@ class EstudianteFactory extends Factory
             'estado' => 'activo',
         ];
     }
+
+    /** Lo inscribe con el pago aprobado y deja ese curso como el actual. */
+    public function enCurso(int $cursoId, string $aprobacion = 'pendiente'): static
+    {
+        return $this->afterCreating(function (Estudiante $estudiante) use ($cursoId, $aprobacion) {
+            $estudiante->asignarCursoActual($cursoId)->update(['estado_aprobacion_curso' => $aprobacion]);
+            $estudiante->unsetRelation('inscripcionActual');
+        });
+    }
 }

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Curso;
 use App\Models\Estudiante;
-use App\Models\Inscripcion;
 use App\Models\Pago;
 use App\Models\Profesor;
 use App\Models\User;
@@ -20,7 +19,7 @@ class PagoController extends Controller
     public function studentIndex(Request $request)
     {
         $query = Pago::with('curso')
-            ->where('user_id', $request->user()->id)
+            ->deUsuario($request->user()->id)
             ->latest();
 
         if ($request->filled('estado')) {
@@ -28,7 +27,7 @@ class PagoController extends Controller
         }
 
         if ($request->filled('curso_id')) {
-            $query->where('curso_id', $request->curso_id);
+            $query->deCurso($request->curso_id);
         }
 
         return response()->json($query->paginate(10));
@@ -49,6 +48,7 @@ class PagoController extends Controller
         ]);
 
         $user = $request->user();
+        $estudiante = Estudiante::where('user_id', $user->id)->firstOrFail();
         $curso = Curso::findOrFail($request->curso_id);
 
         $finalizado = $curso->fecha_fin && $curso->fecha_fin->isPast();
@@ -65,8 +65,8 @@ class PagoController extends Controller
         }
 
         // No permitir doble envío si ya hay un pago pendiente o aprobado
-        $existe = Pago::where('user_id', $user->id)
-            ->where('curso_id', $request->curso_id)
+        $existe = Pago::deUsuario($user->id)
+            ->deCurso($request->curso_id)
             ->whereIn('estado', ['pendiente', 'aprobado'])
             ->exists();
 
@@ -87,35 +87,23 @@ class PagoController extends Controller
 
         $esEfectivo = $request->metodo_pago === 'efectivo';
 
+        // Figura en el listado interno del curso desde que solicita, con el
+        // pago pendiente; no ocupa cupo hasta que se apruebe. Si ya cursa otro,
+        // su acceso a ese curso no cambia.
+        $inscripcion = $estudiante->inscripcionEn($curso->id);
+        if ($inscripcion->estado_pago !== 'aprobado') {
+            $inscripcion->estado_pago = 'pendiente';
+        }
+        $inscripcion->save();
+
         $pago = Pago::create([
-            'user_id' => $user->id,
-            'curso_id' => $request->curso_id,
+            'inscripcion_id' => $inscripcion->id,
             'metodo_pago' => $request->metodo_pago,
             'referencia' => $esEfectivo ? null : $request->referencia,
             'banco_origen' => $esEfectivo ? null : $request->banco_origen,
             'comprobante' => $comprobanteId,
             'estado' => 'pendiente',
         ]);
-
-        // Sin curso actual, el estudiante queda pendiente por pago hasta que el
-        // admin verifique. Si ya cursa otro, su acceso a ese curso no cambia.
-        Estudiante::where('user_id', $user->id)
-            ->whereNull('curso_id')
-            ->update(['estado_pago' => 'pendiente']);
-
-        // Figura en el listado interno del curso desde que solicita, con el
-        // pago pendiente; no ocupa cupo hasta que se apruebe.
-        if ($estudiante = Estudiante::where('user_id', $user->id)->first()) {
-            $inscripcion = Inscripcion::firstOrNew([
-                'estudiante_id' => $estudiante->id,
-                'curso_id' => $curso->id,
-            ]);
-            if ($inscripcion->estado_pago !== 'aprobado') {
-                $inscripcion->estado_pago = 'pendiente';
-                $inscripcion->fecha_inscripcion ??= now()->toDateString();
-                $inscripcion->save();
-            }
-        }
 
         $metodoLabel = [
             'transferencia' => 'transferencia',
@@ -161,7 +149,7 @@ class PagoController extends Controller
 
     public function index(Request $request)
     {
-        $query = Pago::with(['user', 'curso', 'estudiante']);
+        $query = Pago::with(['curso', 'estudiante.user', 'inscripcion']);
 
         if ($search = $this->terminoBusqueda($request)) {
             $query->where(function ($q) use ($search) {
@@ -178,7 +166,7 @@ class PagoController extends Controller
         }
 
         if ($request->filled('curso_id')) {
-            $query->where('curso_id', $request->curso_id);
+            $query->deCurso($request->curso_id);
         }
 
         if ($request->filled('fecha_desde')) {
@@ -227,7 +215,7 @@ class PagoController extends Controller
             'nota_admin' => 'nullable|string|max:500',
         ]);
 
-        $pago = Pago::with(['user', 'curso', 'estudiante'])->findOrFail($id);
+        $pago = Pago::with(['curso', 'estudiante.user', 'inscripcion'])->findOrFail($id);
 
         $resultado = $this->procesarPago($pago, $request->estado, $request->nota_admin);
 
@@ -262,7 +250,7 @@ class PagoController extends Controller
         $procesados = 0;
         $fallidos = [];
 
-        foreach (Pago::with(['user', 'curso', 'estudiante'])->whereIn('id', $datos['ids'])->get() as $pago) {
+        foreach (Pago::with(['curso', 'estudiante.user', 'inscripcion'])->whereIn('id', $datos['ids'])->get() as $pago) {
             $resultado = $this->procesarPago($pago, $datos['estado'], $datos['nota_admin'] ?? null);
 
             if ($resultado['ok']) {
@@ -301,7 +289,7 @@ class PagoController extends Controller
             // Bloquear el curso para evitar aprobaciones simultáneas que excedan el cupo
             $curso = Curso::lockForUpdate()->findOrFail($pago->curso_id);
 
-            $estudiante = Estudiante::where('user_id', $pago->user_id)->first();
+            $estudiante = $pago->inscripcion->estudiante;
 
             if ($estado === 'aprobado') {
                 $yaInscrito = $estudiante && $curso->estudiantes()->whereKey($estudiante->id)->exists();
@@ -320,18 +308,9 @@ class PagoController extends Controller
             if ($estudiante) {
                 if ($estado === 'aprobado') {
                     // El curso pagado pasa a ser el actual; el anterior queda
-                    // en `inscripciones` (ver Estudiante::booted).
-                    $estudiante->update([
-                        'curso_id' => $pago->curso_id,
-                        'estado_pago' => 'aprobado',
-                        'estado' => 'activo',
-                    ]);
-                    // Si ya era su curso actual, el observer no toca la
-                    // inscripción: se marca aquí.
-                    Inscripcion::updateOrCreate(
-                        ['estudiante_id' => $estudiante->id, 'curso_id' => $pago->curso_id],
-                        ['estado_pago' => 'aprobado'],
-                    );
+                    // en `inscripciones`.
+                    $estudiante->update(['estado' => 'activo']);
+                    $estudiante->asignarCursoActual($pago->curso_id);
                 } else {
                     $this->rechazarInscripcion($estudiante, $pago);
                 }
@@ -389,14 +368,13 @@ class PagoController extends Controller
     /**
      * Con el pago rechazado el estudiante deja de estar inscrito en ese curso,
      * aunque antes se hubiera aprobado o el admin lo hubiera asignado a mano.
-     * La inscripción se conserva marcada como `reprobado` para que siga en el
+     * La inscripción se conserva marcada como `rechazado` para que siga en el
      * listado interno del curso, pero ya no ocupa cupo ni la ve el estudiante.
      * Si era su curso actual, vuelve al último curso pagado que le quede.
      */
     private function rechazarInscripcion(Estudiante $estudiante, Pago $pago): void
     {
-        $otroPagoAprobado = Pago::where('user_id', $pago->user_id)
-            ->where('curso_id', $pago->curso_id)
+        $otroPagoAprobado = Pago::where('inscripcion_id', $pago->inscripcion_id)
             ->where('estado', 'aprobado')
             ->whereKeyNot($pago->id)
             ->exists();
@@ -405,7 +383,7 @@ class PagoController extends Controller
             return;
         }
 
-        $estudiante->retirarDeCurso((int) $pago->curso_id, 'reprobado');
+        $estudiante->retirarDeCurso((int) $pago->curso_id, 'rechazado');
     }
 
     /** Avisa al estudiante de la decisión sobre su pago. */
@@ -445,7 +423,6 @@ class PagoController extends Controller
 
     private function formatPago(Pago $pago): array
     {
-        $user = $pago->user;
         $curso = $pago->curso;
         $estudiante = $pago->estudiante;
 
@@ -464,13 +441,13 @@ class PagoController extends Controller
                 'nombre' => $estudiante->nombre,
                 'cedula' => $estudiante->cedula,
                 'foto' => $estudiante->foto,
-                'user' => $user ? [
-                    'name' => $user->name,
-                    'email' => $user->email,
+                'user' => $estudiante->user ? [
+                    'name' => $estudiante->user->name,
+                    'email' => $estudiante->user->email,
                 ] : null,
             ] : null,
             'curso' => $curso ? [
-                'id' => $pago->getRawOriginal('curso_id'),
+                'id' => $curso->id,
                 'nombre' => $curso->nombre,
                 'codigo' => $curso->codigo,
             ] : null,

@@ -8,6 +8,7 @@ use App\Models\Sesion;
 use App\Services\Auditoria;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class AsistenciaController extends Controller
 {
@@ -81,7 +82,15 @@ class AsistenciaController extends Controller
 
         $data = $request->validate([
             'asistencia' => 'required|array',
-            'asistencia.*.estudiante_id' => 'required|integer|exists:estudiantes,id',
+            // Solo quienes figuran en la lista del curso, con el pago aprobado.
+            'asistencia.*.estudiante_id' => [
+                'required',
+                'integer',
+                Rule::exists('inscripciones', 'estudiante_id')
+                    ->where('curso_id', $sesion->curso_id)
+                    ->where('estado_pago', 'aprobado')
+                    ->whereNull('deleted_at'),
+            ],
             'asistencia.*.presente' => 'required|boolean',
             'asistencia.*.observacion' => 'nullable|string|max:255',
         ]);

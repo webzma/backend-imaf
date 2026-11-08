@@ -18,7 +18,7 @@ class Bitacora extends Model
 {
     use HasUlids;
 
-    protected $table = 'bitacora';
+    protected $table = 'bitacoras';
 
     public const UPDATED_AT = null;
 

@@ -219,7 +219,8 @@ class ReporteController extends Controller
     private function pagosDesde(Carbon $desde)
     {
         return Pago::query()
-            ->join('cursos', 'pagos.curso_id', '=', 'cursos.id')
+            ->join('inscripciones', 'pagos.inscripcion_id', '=', 'inscripciones.id')
+            ->join('cursos', 'inscripciones.curso_id', '=', 'cursos.id')
             ->whereNull('pagos.deleted_at')
             ->where('pagos.created_at', '>=', $desde)
             ->get(['pagos.estado', 'pagos.metodo_pago', 'pagos.created_at', 'cursos.precio']);
@@ -228,8 +229,10 @@ class ReporteController extends Controller
     private function pagosPorUsuario(): array
     {
         return Pago::query()
-            ->join('users', 'pagos.user_id', '=', 'users.id')
-            ->join('cursos', 'pagos.curso_id', '=', 'cursos.id')
+            ->join('inscripciones', 'pagos.inscripcion_id', '=', 'inscripciones.id')
+            ->join('estudiantes', 'inscripciones.estudiante_id', '=', 'estudiantes.id')
+            ->join('users', 'estudiantes.user_id', '=', 'users.id')
+            ->join('cursos', 'inscripciones.curso_id', '=', 'cursos.id')
             ->whereNull('pagos.deleted_at')
             ->selectRaw('
                 users.id as user_id,
@@ -258,7 +261,8 @@ class ReporteController extends Controller
     private function pagosPorCurso(): array
     {
         return Pago::query()
-            ->join('cursos', 'pagos.curso_id', '=', 'cursos.id')
+            ->join('inscripciones', 'pagos.inscripcion_id', '=', 'inscripciones.id')
+            ->join('cursos', 'inscripciones.curso_id', '=', 'cursos.id')
             ->whereNull('pagos.deleted_at')
             ->selectRaw('
                 cursos.id as curso_id,
@@ -291,7 +295,8 @@ class ReporteController extends Controller
     private function resumen(): array
     {
         $stats = Pago::query()
-            ->join('cursos', 'pagos.curso_id', '=', 'cursos.id')
+            ->join('inscripciones', 'pagos.inscripcion_id', '=', 'inscripciones.id')
+            ->join('cursos', 'inscripciones.curso_id', '=', 'cursos.id')
             ->whereNull('pagos.deleted_at')
             ->selectRaw('
                 COUNT(pagos.id) as total_pagos,

@@ -18,7 +18,7 @@ class PublicoTest extends TestCase
         $sinFechas = Curso::factory()->create(['estado' => 'activo']);
         Curso::factory()->create(['estado' => 'inactivo']);
         Curso::factory()->create(['estado' => 'activo', 'fecha_fin' => '2026-09-01']);
-        Estudiante::factory()->create(['curso_id' => $abierto->id]);
+        Estudiante::factory()->enCurso($abierto->id)->create();
 
         $res = $this->getJson('/api/publico/cursos')->assertOk();
 

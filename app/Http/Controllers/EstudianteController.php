@@ -55,7 +55,7 @@ class EstudianteController extends Controller
         // filtro: la UI necesita poder listar a quien no tiene curso asignado.
         if ($request->filled('curso_id')) {
             $request->curso_id === 'sin_curso'
-                ? $query->whereNull('curso_id')
+                ? $query->whereDoesntHave('inscripcionActual')
                 : $query->whereHas('cursos', fn ($c) => $c->whereKey($request->curso_id));
         }
 
@@ -66,7 +66,7 @@ class EstudianteController extends Controller
         }
 
         if ($request->filled('estado_pago')) {
-            $query->where('estado_pago', $request->estado_pago);
+            $query->conEstadoPago($request->estado_pago);
         }
 
         $this->aplicarOrden($query, $request, self::ORDEN_ESTUDIANTES, 'nombre');
@@ -182,7 +182,6 @@ class EstudianteController extends Controller
 
             $estudiante = Estudiante::create([
                 'user_id' => $user->id,
-                'curso_id' => $request->curso_id,
                 'nombre' => $user->name,
                 'nacionalidad' => $request->nacionalidad,
                 'cedula' => $request->cedula,
@@ -194,6 +193,10 @@ class EstudianteController extends Controller
                 'fecha_inscripcion' => $request->fecha_inscripcion,
                 'estado' => $request->estado ?? 'activo',
             ]);
+
+            if ($request->filled('curso_id')) {
+                $estudiante->asignarCursoActual((int) $request->curso_id);
+            }
 
             $estudiante->update([
                 'foto_cedula' => CedulaEstudiante::subir(
@@ -375,10 +378,10 @@ class EstudianteController extends Controller
                 'es_actual' => (int) $curso->id === (int) $actualId,
             ]);
 
-        $pendientes = Pago::with('curso:id,codigo,nombre')
-            ->where('user_id', $estudiante->user_id)
+        $pendientes = Pago::with('inscripcion', 'curso:cursos.id,cursos.codigo,cursos.nombre')
+            ->deUsuario($estudiante->user_id)
             ->where('estado', 'pendiente')
-            ->whereNotIn('curso_id', $cursos->pluck('id'))
+            ->whereHas('inscripcion', fn (Builder $i) => $i->whereNotIn('curso_id', $cursos->pluck('id')))
             ->latest()
             ->get()
             ->map(fn ($pago) => [
@@ -630,6 +633,7 @@ class EstudianteController extends Controller
             array_diff_key(
                 $data,
                 array_flip([
+                    'curso_id',
                     'primer_nombre',
                     'segundo_nombre',
                     'primer_apellido',
@@ -637,6 +641,12 @@ class EstudianteController extends Controller
                 ]),
             ),
         );
+
+        if (array_key_exists('curso_id', $data) && (int) $data['curso_id'] !== (int) $estudiante->curso_id) {
+            $data['curso_id']
+                ? $estudiante->asignarCursoActual((int) $data['curso_id'])
+                : $estudiante->dejarSinCursoActual();
+        }
 
         return response()->json(
             $estudiante->load('user', 'curso')->makeVisible('foto_cedula'),
@@ -660,7 +670,7 @@ class EstudianteController extends Controller
         $estudiante = Estudiante::with('user', 'curso')->findOrFail($id);
 
         $data = $request->validate([
-            'estado_pago' => 'required|in:pendiente,aprobado,reprobado',
+            'estado_pago' => 'required|in:pendiente,aprobado,rechazado',
         ]);
 
         $anterior = $estudiante->estado_pago;
@@ -674,22 +684,15 @@ class EstudianteController extends Controller
 
         // El estado de pago es el del curso actual. Si deja de estar
         // aprobado, el estudiante sale del curso: antes seguía dentro con el
-        // pago "reprobado" a la vista.
+        // pago "rechazado" a la vista.
         if ($curso && $data['estado_pago'] !== 'aprobado') {
             $estudiante->retirarDeCurso((int) $curso->id, $data['estado_pago']);
-        } else {
-            $estudiante->update($data);
-            if ($curso) {
-                Inscripcion::where('estudiante_id', $estudiante->id)
-                    ->where('curso_id', $curso->id)
-                    ->update(['estado_pago' => 'aprobado']);
-            }
         }
 
         if (
             $curso &&
             $anterior !== $data['estado_pago'] &&
-            in_array($data['estado_pago'], ['aprobado', 'reprobado'], true)
+            in_array($data['estado_pago'], ['aprobado', 'rechazado'], true)
         ) {
             $estudiante->user?->notify(new SolicitudCursoProcesada(
                 nombreCurso: $curso->nombre,
@@ -783,10 +786,6 @@ class EstudianteController extends Controller
             ->where('curso_id', $curso->id)
             ->update(['estado_aprobacion_curso' => $nuevoEstado]);
 
-        if ((int) $curso->id === (int) $estudiante->curso_id) {
-            $estudiante->update($data);
-        }
-
         if ($cambio && in_array($nuevoEstado, ['aprobado', 'reprobado'], true)) {
             $estudiante->user?->notify(
                 new SolicitudCursoProcesada(
@@ -798,8 +797,7 @@ class EstudianteController extends Controller
             );
         }
 
-        $estudiante->refresh();
-        $estudiante->setAttribute('estado_aprobacion_curso', $nuevoEstado);
+        $estudiante->refresh()->setAttribute('estado_aprobacion_curso', $nuevoEstado);
 
         return response()->json($estudiante->load('user', 'curso'));
     }

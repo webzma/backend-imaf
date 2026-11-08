@@ -50,8 +50,8 @@ class CatalogoSeeder extends Seeder
             ]);
         }
 
-        if (! DB::table('niveles_cursos')->count()) {
-            DB::table('niveles_cursos')->insert([
+        if (! DB::table('niveles_curso')->count()) {
+            DB::table('niveles_curso')->insert([
                 ['nombre' => 'Básico', 'created_at' => now(), 'updated_at' => now()],
                 ['nombre' => 'Intermedio', 'created_at' => now(), 'updated_at' => now()],
                 ['nombre' => 'Avanzado', 'created_at' => now(), 'updated_at' => now()],

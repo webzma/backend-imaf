@@ -13,7 +13,7 @@ class TipoContrato extends Model
 
     protected string $auditNombre = 'tipo de contrato';
 
-    protected $table = 'tipo_contratos';
+    protected $table = 'tipos_contrato';
 
     protected $fillable = [
         'nombre',

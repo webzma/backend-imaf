@@ -14,7 +14,7 @@ class SolicitudCursoProcesada extends Notification
     public const TIPO_APROBACION_CURSO = 'aprobacion_curso';
 
     /**
-     * @param  'aprobado'|'reprobado'  $estado
+     * @param  'aprobado'|'reprobado'|'rechazado'  $estado
      */
     public function __construct(
         public string $nombreCurso,

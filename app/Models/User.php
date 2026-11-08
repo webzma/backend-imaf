@@ -140,9 +140,4 @@ class User extends Authenticatable
     {
         return $this->hasOne(Profesor::class);
     }
-
-    public function pagos()
-    {
-        return $this->hasMany(Pago::class);
-    }
 }

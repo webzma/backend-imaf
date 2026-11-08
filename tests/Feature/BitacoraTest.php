@@ -151,7 +151,7 @@ class BitacoraTest extends TestCase
     {
         $estudiante = Estudiante::factory()->create();
         $curso = Curso::factory()->create(['precio' => 80]);
-        $pago = Pago::create([
+        $pago = $this->registrarPago([
             'user_id' => $estudiante->user_id,
             'curso_id' => $curso->id,
             'metodo_pago' => 'efectivo',
@@ -170,9 +170,9 @@ class BitacoraTest extends TestCase
         $this->assertSame($solicitud, $aprobado->solicitud_id);
         $this->assertEquals(80, $aprobado->metadatos['monto']);
         $this->assertSame('negocio', $aprobado->categoria);
-        // El mismo id agrupa el cambio del pago y el del estudiante.
+        // El mismo id agrupa el cambio del pago y el de la inscripción.
         $this->assertTrue(Bitacora::where('solicitud_id', $solicitud)->where('evento', 'pago.actualizado')->exists());
-        $this->assertTrue(Bitacora::where('solicitud_id', $solicitud)->where('evento', 'estudiante.actualizado')->exists());
+        $this->assertTrue(Bitacora::where('solicitud_id', $solicitud)->where('evento', 'inscripcion.actualizado')->exists());
     }
 
     public function test_respeta_un_x_request_id_valido_del_cliente(): void
@@ -236,7 +236,7 @@ class BitacoraTest extends TestCase
         $registro = Auditoria::registrar('sistema.prueba', 'Original', ['metadatos' => ['b' => 1, 'a' => [2.5, 'x']]]);
         $this->assertTrue($registro->fresh()->huellaValida());
 
-        DB::table('bitacora')->where('id', $registro->id)->update(['descripcion' => 'Manipulada']);
+        DB::table('bitacoras')->where('id', $registro->id)->update(['descripcion' => 'Manipulada']);
 
         $this->assertFalse($registro->fresh()->huellaValida());
         $this->artisan('bitacora:verificar')->assertFailed();
@@ -245,7 +245,7 @@ class BitacoraTest extends TestCase
 
     public function test_un_fallo_de_la_bitacora_no_interrumpe_la_operacion(): void
     {
-        Schema::drop('bitacora');
+        Schema::drop('bitacoras');
 
         $this->assertNull(Auditoria::registrar('sistema.prueba', 'Sin tabla'));
         $curso = Curso::factory()->create();

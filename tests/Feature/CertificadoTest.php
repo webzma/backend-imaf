@@ -23,10 +23,7 @@ class CertificadoTest extends TestCase
     public function test_no_genera_certificado_si_el_estudiante_no_aprobo(): void
     {
         $curso = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create([
-            'curso_id' => $curso->id,
-            'estado_aprobacion_curso' => 'pendiente',
-        ]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id, 'pendiente')->create();
 
         $this->getJson("/api/admin/estudiantes/{$estudiante->id}/certificado")
             ->assertStatus(422)
@@ -37,10 +34,7 @@ class CertificadoTest extends TestCase
 
     public function test_no_genera_certificado_si_faltan_datos_del_curso(): void
     {
-        $estudiante = Estudiante::factory()->create([
-            'curso_id' => null,
-            'estado_aprobacion_curso' => 'aprobado',
-        ]);
+        $estudiante = Estudiante::factory()->create();
 
         $this->getJson("/api/admin/estudiantes/{$estudiante->id}/certificado")
             ->assertStatus(422)
@@ -50,10 +44,7 @@ class CertificadoTest extends TestCase
     public function test_genera_pdf_cuando_el_estudiante_aprobo(): void
     {
         $curso = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create([
-            'curso_id' => $curso->id,
-            'estado_aprobacion_curso' => 'aprobado',
-        ]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id, 'aprobado')->create();
 
         $response = $this->get("/api/admin/estudiantes/{$estudiante->id}/certificado");
 

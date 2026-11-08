@@ -4,11 +4,12 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /** Un curso que un estudiante cursó o cursa. */
 class Inscripcion extends Model
 {
-    use Auditable;
+    use Auditable, SoftDeletes;
 
     protected string $auditEntidad = 'inscripcion';
 
@@ -22,12 +23,15 @@ class Inscripcion extends Model
         'estado_pago',
         'estado_aprobacion_curso',
         'fecha_inscripcion',
+        'es_actual',
     ];
 
     protected function casts(): array
     {
         return [
             'fecha_inscripcion' => 'date',
+            // Solo `true` o `null`: ver el índice único de la migración.
+            'es_actual' => 'boolean',
         ];
     }
 
@@ -48,5 +52,10 @@ class Inscripcion extends Model
     public function curso()
     {
         return $this->belongsTo(Curso::class);
+    }
+
+    public function pagos()
+    {
+        return $this->hasMany(Pago::class);
     }
 }

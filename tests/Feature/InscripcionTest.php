@@ -9,13 +9,12 @@ use App\Models\Pago;
 use App\Models\User;
 use App\Notifications\GenericNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * Un estudiante puede cursar varios cursos: el actual vive en `curso_id` y
+ * Un estudiante puede cursar varios cursos: el actual es el marcado con `es_actual` y
  * todos quedan en `inscripciones`.
  */
 class InscripcionTest extends TestCase
@@ -33,7 +32,7 @@ class InscripcionTest extends TestCase
 
     private function pagoPendiente(Estudiante $estudiante, Curso $curso): Pago
     {
-        return Pago::create([
+        return $this->registrarPago([
             'user_id' => $estudiante->user_id,
             'curso_id' => $curso->id,
             'metodo_pago' => 'efectivo',
@@ -87,7 +86,7 @@ class InscripcionTest extends TestCase
     {
         $anterior = Curso::factory()->create();
         $curso = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create(['curso_id' => $anterior->id]);
+        $estudiante = Estudiante::factory()->enCurso($anterior->id)->create();
         $pago = $this->pagoPendiente($estudiante, $curso);
         $this->resolverPago($pago, 'aprobado')->assertOk();
 
@@ -104,13 +103,13 @@ class InscripcionTest extends TestCase
     public function test_rechazar_el_pago_de_un_curso_asignado_a_mano_lo_deja_sin_curso(): void
     {
         $curso = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
 
         $this->resolverPago($this->pagoPendiente($estudiante, $curso), 'rechazado')->assertOk();
 
         $estudiante->refresh();
         $this->assertNull($estudiante->curso_id);
-        $this->assertSame('reprobado', $estudiante->estado_pago);
+        $this->assertSame('rechazado', $estudiante->estado_pago);
         $this->assertSame(0, $estudiante->cursos()->count());
 
         Sanctum::actingAs($estudiante->user);
@@ -141,7 +140,7 @@ class InscripcionTest extends TestCase
     public function test_el_listado_interno_incluye_a_quien_no_ha_pagado(): void
     {
         $curso = Curso::factory()->create(['limite_cupo' => 5]);
-        $pagado = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $pagado = Estudiante::factory()->enCurso($curso->id)->create();
         $pendiente = Estudiante::factory()->create();
         $rechazado = Estudiante::factory()->create();
 
@@ -154,7 +153,7 @@ class InscripcionTest extends TestCase
 
         $this->assertSame('aprobado', $listado[$pagado->id]['estado_pago']);
         $this->assertSame('pendiente', $listado[$pendiente->id]['estado_pago']);
-        $this->assertSame('reprobado', $listado[$rechazado->id]['estado_pago']);
+        $this->assertSame('rechazado', $listado[$rechazado->id]['estado_pago']);
         // Solo el que pagó ocupa cupo.
         $this->assertSame(4, $curso->fresh()->cupos_restantes);
     }
@@ -162,8 +161,8 @@ class InscripcionTest extends TestCase
     public function test_el_listado_interno_incluye_inactivos_y_archivados(): void
     {
         $curso = Curso::factory()->create();
-        $inactivo = Estudiante::factory()->create(['curso_id' => $curso->id, 'estado' => 'inactivo']);
-        $archivado = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $inactivo = Estudiante::factory()->enCurso($curso->id)->create(['estado' => 'inactivo']);
+        $archivado = Estudiante::factory()->enCurso($curso->id)->create();
         $archivado->delete();
 
         $listado = $this->listadoInterno($curso);
@@ -175,7 +174,7 @@ class InscripcionTest extends TestCase
     public function test_el_instructor_ve_el_listado_completo_y_el_estudiante_no(): void
     {
         $curso = Curso::factory()->create();
-        $pagado = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $pagado = Estudiante::factory()->enCurso($curso->id)->create();
         $rechazado = Estudiante::factory()->create();
         $this->resolverPago($this->pagoPendiente($rechazado, $curso), 'rechazado')->assertOk();
 
@@ -193,7 +192,7 @@ class InscripcionTest extends TestCase
     {
         $anterior = Curso::factory()->create();
         $curso = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create(['curso_id' => $anterior->id]);
+        $estudiante = Estudiante::factory()->enCurso($anterior->id)->create();
 
         Sanctum::actingAs($this->admin);
         $this->postJson("/api/admin/cursos/{$curso->id}/estudiantes", ['estudiante_id' => $estudiante->id])
@@ -223,7 +222,7 @@ class InscripcionTest extends TestCase
     public function test_inscribir_respeta_el_cupo(): void
     {
         $curso = Curso::factory()->create(['limite_cupo' => 1]);
-        Estudiante::factory()->create(['curso_id' => $curso->id]);
+        Estudiante::factory()->enCurso($curso->id)->create();
         $otro = Estudiante::factory()->create();
 
         Sanctum::actingAs($this->admin);
@@ -234,7 +233,7 @@ class InscripcionTest extends TestCase
     public function test_la_api_declara_la_modalidad_presencial(): void
     {
         $curso = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
 
         Sanctum::actingAs($estudiante->user);
         $this->getJson('/api/estudiante/cursos')->assertJsonPath('data.0.modalidad', 'presencial');
@@ -268,17 +267,17 @@ class InscripcionTest extends TestCase
     {
         $anterior = Curso::factory()->create();
         $curso = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create(['curso_id' => $anterior->id]);
-        $estudiante->update(['curso_id' => $curso->id]);
+        $estudiante = Estudiante::factory()->enCurso($anterior->id)->create();
+        $estudiante->asignarCursoActual($curso->id);
 
         Sanctum::actingAs($this->admin);
-        $this->patchJson("/api/admin/estudiantes/{$estudiante->id}/estado-pago", ['estado_pago' => 'reprobado'])
+        $this->patchJson("/api/admin/estudiantes/{$estudiante->id}/estado-pago", ['estado_pago' => 'rechazado'])
             ->assertOk();
 
         $estudiante->refresh();
         $this->assertSame($anterior->id, $estudiante->curso_id);
         $this->assertSame('aprobado', $estudiante->estado_pago);
-        $this->assertSame('reprobado', $this->listadoInterno($curso)[$estudiante->id]['estado_pago']);
+        $this->assertSame('rechazado', $this->listadoInterno($curso)[$estudiante->id]['estado_pago']);
 
         Sanctum::actingAs($estudiante->user);
         $this->getJson('/api/estudiante/curso')
@@ -290,9 +289,9 @@ class InscripcionTest extends TestCase
     public function test_asignar_un_curso_deja_el_pago_al_dia(): void
     {
         $curso = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create(['estado_pago' => 'pendiente']);
+        $estudiante = Estudiante::factory()->create();
 
-        $estudiante->update(['curso_id' => $curso->id]);
+        $estudiante->asignarCursoActual($curso->id);
 
         $this->assertSame('aprobado', $estudiante->fresh()->estado_pago);
     }
@@ -300,53 +299,13 @@ class InscripcionTest extends TestCase
     public function test_el_perfil_no_muestra_un_curso_sin_pago_aprobado(): void
     {
         $curso = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
         // Datos antiguos: curso actual con la inscripción sin pagar.
-        Inscripcion::where('estudiante_id', $estudiante->id)->update(['estado_pago' => 'reprobado']);
+        Inscripcion::where('estudiante_id', $estudiante->id)->update(['estado_pago' => 'rechazado']);
 
         Sanctum::actingAs($estudiante->user);
         $this->assertNull($this->getJson('/api/estudiante/perfil')->json('curso'));
         $this->getJson('/api/estudiante/curso')->assertNotFound();
-    }
-
-    public function test_la_migracion_alinea_el_curso_actual_con_el_pago(): void
-    {
-        $pagado = Curso::factory()->create();
-        $rechazado = Curso::factory()->create();
-        $enRevision = Curso::factory()->create();
-        $manual = Curso::factory()->create();
-
-        $conRechazo = Estudiante::factory()->create(['curso_id' => $pagado->id]);
-        $conPendiente = Estudiante::factory()->create();
-        $sinPagos = Estudiante::factory()->create();
-
-        // Estado roto, como lo dejaba el código anterior.
-        DB::table('estudiantes')->where('id', $conRechazo->id)
-            ->update(['curso_id' => $rechazado->id, 'estado_pago' => 'reprobado']);
-        DB::table('inscripciones')->insert(['estudiante_id' => $conRechazo->id, 'curso_id' => $rechazado->id, 'estado_pago' => 'aprobado', 'estado_aprobacion_curso' => 'pendiente']);
-        $this->pagoPendiente($conRechazo, $rechazado)->update(['estado' => 'rechazado']);
-
-        DB::table('estudiantes')->where('id', $conPendiente->id)
-            ->update(['curso_id' => $enRevision->id, 'estado_pago' => 'pendiente']);
-        $this->pagoPendiente($conPendiente, $enRevision);
-
-        DB::table('estudiantes')->where('id', $sinPagos->id)
-            ->update(['curso_id' => $manual->id, 'estado_pago' => 'pendiente']);
-
-        (require database_path('migrations/2026_09_25_000000_alinear_curso_actual_con_pago_aprobado.php'))->up();
-
-        $conRechazo->refresh();
-        $this->assertSame($pagado->id, $conRechazo->curso_id);
-        $this->assertSame('aprobado', $conRechazo->estado_pago);
-        $this->assertSame('reprobado', Inscripcion::where('estudiante_id', $conRechazo->id)->where('curso_id', $rechazado->id)->value('estado_pago'));
-
-        $conPendiente->refresh();
-        $this->assertNull($conPendiente->curso_id);
-        $this->assertSame('pendiente', $conPendiente->estado_pago);
-
-        $sinPagos->refresh();
-        $this->assertSame($manual->id, $sinPagos->curso_id);
-        $this->assertSame('aprobado', $sinPagos->estado_pago);
     }
 
     public function test_un_curso_terminado_deja_de_ser_mi_curso_pero_sigue_en_el_historial(): void
@@ -357,10 +316,7 @@ class InscripcionTest extends TestCase
             'fecha_fin' => '2026-09-01',
             'estado' => 'inactivo',
         ]);
-        $estudiante = Estudiante::factory()->create([
-            'curso_id' => $curso->id,
-            'estado_aprobacion_curso' => 'aprobado',
-        ]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id, 'aprobado')->create();
 
         Sanctum::actingAs($estudiante->user);
 
@@ -382,7 +338,7 @@ class InscripcionTest extends TestCase
     public function test_el_curso_deja_de_ser_actual_el_dia_de_su_fecha_de_fin(): void
     {
         $curso = Curso::factory()->create(['fecha_fin' => '2026-09-24', 'estado' => 'activo']);
-        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
 
         $this->travelTo('2026-09-23 18:00:00');
         $this->assertSame($curso->id, $estudiante->cursoActual()?->id);
@@ -399,7 +355,7 @@ class InscripcionTest extends TestCase
             'fecha_fin' => '2026-12-11',
             'estado' => 'activo',
         ]);
-        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
 
         Sanctum::actingAs($estudiante->user);
         $this->assertSame($curso->id, $this->getJson('/api/estudiante/perfil')->json('curso.id'));
@@ -409,7 +365,7 @@ class InscripcionTest extends TestCase
     public function test_un_curso_inactivo_no_es_mi_curso(): void
     {
         $curso = Curso::factory()->create(['estado' => 'inactivo']);
-        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
 
         Sanctum::actingAs($estudiante->user);
         $this->assertNull($this->getJson('/api/estudiante/perfil')->json('curso'));
@@ -419,10 +375,7 @@ class InscripcionTest extends TestCase
     {
         $primero = Curso::factory()->create();
         $segundo = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create([
-            'curso_id' => $primero->id,
-            'estado_aprobacion_curso' => 'aprobado',
-        ]);
+        $estudiante = Estudiante::factory()->enCurso($primero->id, 'aprobado')->create();
 
         $this->resolverPago($this->pagoPendiente($estudiante, $segundo), 'aprobado')->assertOk();
 
@@ -441,8 +394,8 @@ class InscripcionTest extends TestCase
     {
         $lleno = Curso::factory()->create(['limite_cupo' => 1]);
         $otro = Curso::factory()->create();
-        $antiguo = Estudiante::factory()->create(['curso_id' => $lleno->id]);
-        $antiguo->update(['curso_id' => $otro->id]);
+        $antiguo = Estudiante::factory()->enCurso($lleno->id)->create();
+        $antiguo->asignarCursoActual($otro->id);
 
         $nuevo = Estudiante::factory()->create();
 
@@ -453,10 +406,7 @@ class InscripcionTest extends TestCase
     {
         $actual = Curso::factory()->create();
         $otro = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create([
-            'curso_id' => $actual->id,
-            'estado_pago' => 'aprobado',
-        ]);
+        $estudiante = Estudiante::factory()->enCurso($actual->id)->create();
 
         Sanctum::actingAs($estudiante->user);
         $this->postJson('/api/estudiante/pagos', [
@@ -477,8 +427,8 @@ class InscripcionTest extends TestCase
         $primero = Curso::factory()->create();
         $segundo = Curso::factory()->create();
         $solicitado = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create(['curso_id' => $primero->id]);
-        $estudiante->update(['curso_id' => $segundo->id]);
+        $estudiante = Estudiante::factory()->enCurso($primero->id)->create();
+        $estudiante->asignarCursoActual($segundo->id);
         $this->pagoPendiente($estudiante, $solicitado);
 
         Sanctum::actingAs($estudiante->user);
@@ -496,8 +446,8 @@ class InscripcionTest extends TestCase
         $anterior = Curso::factory()->create();
         $actual = Curso::factory()->create();
         $ajeno = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create(['curso_id' => $anterior->id]);
-        $estudiante->update(['curso_id' => $actual->id]);
+        $estudiante = Estudiante::factory()->enCurso($anterior->id)->create();
+        $estudiante->asignarCursoActual($actual->id);
 
         Sanctum::actingAs($estudiante->user);
 
@@ -512,8 +462,8 @@ class InscripcionTest extends TestCase
     {
         $anterior = Curso::factory()->create();
         $actual = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create(['curso_id' => $anterior->id]);
-        $estudiante->update(['curso_id' => $actual->id]);
+        $estudiante = Estudiante::factory()->enCurso($anterior->id)->create();
+        $estudiante->asignarCursoActual($actual->id);
 
         Sanctum::actingAs($anterior->instructor->user);
         $this->patchJson("/api/profesor/estudiantes/{$estudiante->id}/aprobacion-curso", [
@@ -533,7 +483,7 @@ class InscripcionTest extends TestCase
     {
         $suyo = Curso::factory()->create();
         $ajeno = Curso::factory()->create();
-        $estudiante = Estudiante::factory()->create(['curso_id' => $ajeno->id]);
+        $estudiante = Estudiante::factory()->enCurso($ajeno->id)->create();
 
         Sanctum::actingAs($suyo->instructor->user);
         $this->patchJson("/api/profesor/estudiantes/{$estudiante->id}/aprobacion-curso", [

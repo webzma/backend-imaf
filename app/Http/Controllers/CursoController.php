@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Resources\CursoResumenResource;
 use App\Models\Curso;
 use App\Models\Estudiante;
-use App\Models\Inscripcion;
 use App\Models\Profesor;
 use App\Notifications\GenericNotification;
 use App\Rules\DiaHabil;
@@ -47,7 +46,8 @@ class CursoController extends Controller
 
         if ($request->filled('profesor_id')) {
             $request->profesor_id === 'sin_instructor'
-                ? $query->whereNull('profesor_id')
+                // También cuenta el curso cuyo profesor fue dado de baja.
+                ? $query->whereDoesntHave('instructor')
                 : $query->where('profesor_id', $request->profesor_id);
         }
 
@@ -101,7 +101,7 @@ class CursoController extends Controller
     {
         $data = $request->validate([
             'profesor_id' => ['required', Rule::exists('profesores', 'id')],
-            'nivel_curso_id' => ['nullable', Rule::exists('niveles_cursos', 'id')],
+            'nivel_curso_id' => ['nullable', Rule::exists('niveles_curso', 'id')],
             'nombre' => 'required|string|max:255',
             'limite_cupo' => 'required|integer|min:1',
             'minimo_estudiantes' => 'nullable|integer|min:1|lte:limite_cupo',
@@ -177,10 +177,7 @@ class CursoController extends Controller
                 ], 422);
             }
 
-            $estudiante->update(['curso_id' => $curso->id, 'estado_pago' => 'aprobado']);
-            Inscripcion::where('estudiante_id', $estudiante->id)
-                ->where('curso_id', $curso->id)
-                ->update(['estado_pago' => 'aprobado']);
+            $estudiante->asignarCursoActual($curso->id);
 
             Auditoria::registrar('inscripcion.asignada', "Inscripción manual de {$estudiante->nombre} en «{$curso->nombre}»", [
                 'entidad' => $curso,
@@ -192,7 +189,7 @@ class CursoController extends Controller
     }
 
     /**
-     * Admin: quita al estudiante del curso (borra la inscripción). Si era su
+     * Admin: quita al estudiante del curso. Si era su
      * curso actual, vuelve al último curso pagado que le quede.
      */
     public function quitarEstudiante(string $id, string $estudianteId)
@@ -200,22 +197,7 @@ class CursoController extends Controller
         $curso = Curso::findOrFail($id);
         $estudiante = Estudiante::withTrashed()->findOrFail($estudianteId);
 
-        Inscripcion::where('estudiante_id', $estudiante->id)
-            ->where('curso_id', $curso->id)
-            ->delete();
-
-        if ((int) $estudiante->curso_id === (int) $curso->id) {
-            $anterior = $estudiante->inscripciones()
-                ->where('estado_pago', 'aprobado')
-                ->orderByDesc('fecha_inscripcion')
-                ->orderByDesc('id')
-                ->first();
-
-            $estudiante->update([
-                'curso_id' => $anterior?->curso_id,
-                'estado_pago' => $anterior ? 'aprobado' : 'pendiente',
-            ]);
-        }
+        $estudiante->quitarDeCurso($curso->id);
 
         Auditoria::registrar('inscripcion.eliminada', "Se quitó a {$estudiante->nombre} del curso «{$curso->nombre}»", [
             'nivel' => 'aviso',
@@ -244,7 +226,7 @@ class CursoController extends Controller
 
         $data = $request->validate([
             'profesor_id' => ['sometimes', Rule::exists('profesores', 'id')],
-            'nivel_curso_id' => ['nullable', Rule::exists('niveles_cursos', 'id')],
+            'nivel_curso_id' => ['nullable', Rule::exists('niveles_curso', 'id')],
             'nombre' => 'sometimes|string|max:255',
             'limite_cupo' => 'sometimes|integer|min:1',
             'minimo_estudiantes' => 'nullable|integer|min:1',

@@ -264,7 +264,7 @@ class EstudianteTest extends TestCase
     {
         $profesor = Profesor::factory()->create();
         $curso = Curso::factory()->create(['profesor_id' => $profesor->id]);
-        $estudiante = Estudiante::factory()->create(['curso_id' => $curso->id]);
+        $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
         $sesion = Sesion::create([
             'curso_id' => $curso->id,
             'titulo' => 'Clase 1',

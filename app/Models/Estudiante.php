@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use App\Services\Auditoria;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class Estudiante extends Model
 {
@@ -25,11 +27,19 @@ class Estudiante extends Model
 
     use HasFactory, SoftDeletes;
 
-    protected $hidden = ['foto_cedula'];
+    protected $hidden = ['foto_cedula', 'inscripcionActual', 'ultimaInscripcion'];
+
+    /**
+     * El curso actual y los estados de pago y aprobación ya no son columnas:
+     * se obtienen de `inscripciones`, y la API los sigue exponiendo igual.
+     * Se cargan siempre para que un listado no haga una consulta por fila.
+     */
+    protected $with = ['inscripcionActual', 'ultimaInscripcion'];
+
+    protected $appends = ['curso_id', 'estado_pago', 'estado_aprobacion_curso'];
 
     protected $fillable = [
         'user_id',
-        'curso_id',
         'nombre',
         'nacionalidad',
         'cedula',
@@ -42,8 +52,6 @@ class Estudiante extends Model
         'foto_cedula',
         'fecha_inscripcion',
         'estado',
-        'estado_pago',
-        'estado_aprobacion_curso',
     ];
 
     protected function casts(): array
@@ -54,58 +62,98 @@ class Estudiante extends Model
         ];
     }
 
-    /**
-     * `curso_id` es el curso actual; `inscripciones` guarda todos. Cada vez
-     * que cambia el curso actual se registra la inscripción, y el estado de
-     * aprobación pasa a ser el de ese curso (antes arrastraba el del curso
-     * anterior, y con él un certificado que no correspondía).
-     *
-     * Regla: el curso actual es siempre uno con el pago aprobado. Por eso, al
-     * asignar un curso, el pago del estudiante queda aprobado; para sacarlo
-     * de un curso sin pagar está `retirarDeCurso()`.
-     */
-    protected static function booted(): void
+    public function getCursoIdAttribute(): ?int
     {
-        static::saving(function (Estudiante $estudiante) {
-            if ($estudiante->isDirty('curso_id') && $estudiante->curso_id) {
-                $estudiante->estado_pago = 'aprobado';
+        return $this->inscripcionActual?->curso_id;
+    }
+
+    /**
+     * El pago del curso actual o, sin curso actual, el de su última solicitud.
+     * El listado de un curso fija el valor de ese curso con `forceFill` (ver
+     * CursoController); se lee de `attributes` porque Laravel llama a los
+     * campos calculados de `$appends` sin pasarles el valor.
+     */
+    public function getEstadoPagoAttribute(): string
+    {
+        return $this->attributes['estado_pago']
+            ?? ($this->inscripcionActual ? 'aprobado' : $this->ultimaInscripcion?->estado_pago)
+            ?? 'pendiente';
+    }
+
+    public function getEstadoAprobacionCursoAttribute(): string
+    {
+        return $this->attributes['estado_aprobacion_curso']
+            ?? $this->inscripcionActual?->estado_aprobacion_curso
+            ?? 'pendiente';
+    }
+
+    /** Filtra por el mismo valor que devuelve `estado_pago`. */
+    public function scopeConEstadoPago(Builder $query, string $estado): void
+    {
+        $query->whereRaw(
+            "COALESCE((
+                SELECT i.estado_pago FROM inscripciones i
+                WHERE i.estudiante_id = estudiantes.id AND i.deleted_at IS NULL
+                ORDER BY i.es_actual DESC, i.updated_at DESC, i.id DESC
+                LIMIT 1
+            ), 'pendiente') = ?",
+            [$estado],
+        );
+    }
+
+    /**
+     * Inscripción de este estudiante en un curso, nueva si no existía. Si lo
+     * habían quitado de ese curso empieza de cero, sin el pago de entonces.
+     * No la guarda: cada llamador fija antes el estado que corresponde.
+     */
+    public function inscripcionEn(int $cursoId): Inscripcion
+    {
+        $inscripcion = Inscripcion::withTrashed()->firstOrNew([
+            'estudiante_id' => $this->id,
+            'curso_id' => $cursoId,
+        ]);
+
+        if ($inscripcion->trashed()) {
+            $inscripcion->deleted_at = null;
+            $inscripcion->estado_pago = 'pendiente';
+            $inscripcion->estado_aprobacion_curso = 'pendiente';
+            $inscripcion->fecha_inscripcion = null;
+        }
+
+        $inscripcion->fecha_inscripcion ??= now()->toDateString();
+
+        return $inscripcion;
+    }
+
+    /**
+     * Regla: el curso actual es siempre uno con el pago aprobado. Por eso, al
+     * asignar un curso, la inscripción queda aprobada; para sacarlo de un
+     * curso sin pagar está `retirarDeCurso()`.
+     */
+    public function asignarCursoActual(int $cursoId): Inscripcion
+    {
+        return DB::transaction(function () use ($cursoId) {
+            $inscripcion = $this->inscripcionEn($cursoId);
+
+            if ($inscripcion->es_actual !== true) {
+                $this->dejarSinCursoActual();
             }
 
-            if (
-                $estudiante->exists &&
-                $estudiante->isDirty('curso_id') &&
-                ! $estudiante->isDirty('estado_aprobacion_curso')
-            ) {
-                $estudiante->estado_aprobacion_curso = $estudiante->curso_id
-                    ? Inscripcion::where('estudiante_id', $estudiante->id)
-                        ->where('curso_id', $estudiante->curso_id)
-                        ->value('estado_aprobacion_curso') ?? 'pendiente'
-                    : 'pendiente';
-            }
-        });
-
-        static::saved(function (Estudiante $estudiante) {
-            if (! $estudiante->curso_id) {
-                return;
-            }
-
-            if (
-                ! $estudiante->wasRecentlyCreated &&
-                ! $estudiante->wasChanged(['curso_id', 'estado_aprobacion_curso'])
-            ) {
-                return;
-            }
-
-            $inscripcion = Inscripcion::firstOrNew([
-                'estudiante_id' => $estudiante->id,
-                'curso_id' => $estudiante->curso_id,
-            ]);
-            $inscripcion->fecha_inscripcion ??= now()->toDateString();
-            // El curso actual es, por definición, uno en el que está inscrito.
             $inscripcion->estado_pago = 'aprobado';
-            $inscripcion->estado_aprobacion_curso = $estudiante->estado_aprobacion_curso ?? 'pendiente';
+            $inscripcion->es_actual = true;
             $inscripcion->save();
+
+            $this->olvidarInscripciones();
+
+            return $inscripcion;
         });
+    }
+
+    /** Conserva sus inscripciones; solo deja de tener un curso en marcha. */
+    public function dejarSinCursoActual(): void
+    {
+        $this->inscripcionActual()->first()?->update(['es_actual' => null]);
+        $this->olvidarInscripciones();
     }
 
     /**
@@ -114,39 +162,71 @@ class Estudiante extends Model
      * sigue mostrando), pero deja de dar acceso. Si era su curso actual,
      * vuelve al último curso pagado que le quede o se queda sin curso.
      *
-     * @param  'pendiente'|'reprobado'  $estadoPago
+     * @param  'pendiente'|'rechazado'  $estadoPago
      */
     public function retirarDeCurso(int $cursoId, string $estadoPago): void
     {
-        $inscripcion = Inscripcion::firstOrNew([
-            'estudiante_id' => $this->id,
-            'curso_id' => $cursoId,
-        ]);
+        $inscripcion = $this->inscripcionEn($cursoId);
+        $eraActual = $inscripcion->es_actual === true;
+
         $inscripcion->estado_pago = $estadoPago;
-        $inscripcion->fecha_inscripcion ??= now()->toDateString();
+        $inscripcion->es_actual = null;
         $inscripcion->save();
 
         Auditoria::registrar('inscripcion.retirada', "Retiro de {$this->nombre} del curso por pago {$estadoPago}", [
             'entidad' => $inscripcion,
-            'metadatos' => ['curso_id' => $cursoId, 'estado_pago' => $estadoPago, 'era_curso_actual' => (int) $this->curso_id === $cursoId],
+            'metadatos' => ['curso_id' => $cursoId, 'estado_pago' => $estadoPago, 'era_curso_actual' => $eraActual],
         ]);
 
-        if ($this->curso_id && (int) $this->curso_id !== $cursoId) {
+        if ($eraActual) {
+            $this->volverAlUltimoCursoPagado();
+        }
+
+        $this->olvidarInscripciones();
+    }
+
+    /**
+     * Quita al estudiante del curso. Si la inscripción tiene pagos se conserva
+     * como retirada, porque esos pagos dependen de ella; si no, se borra.
+     */
+    public function quitarDeCurso(int $cursoId): void
+    {
+        $inscripcion = $this->inscripciones()->where('curso_id', $cursoId)->first();
+
+        if (! $inscripcion) {
             return;
         }
 
-        $anterior = $this->curso_id
-            ? $this->inscripciones()
-                ->where('estado_pago', 'aprobado')
-                ->orderByDesc('fecha_inscripcion')
-                ->orderByDesc('id')
-                ->first()
-            : null;
+        $eraActual = $inscripcion->es_actual === true;
 
-        $this->update([
-            'curso_id' => $anterior?->curso_id,
-            'estado_pago' => $anterior ? 'aprobado' : $estadoPago,
-        ]);
+        $inscripcion->update(['es_actual' => null]);
+        $inscripcion->pagos()->withTrashed()->exists()
+            ? $inscripcion->delete()
+            : $inscripcion->forceDelete();
+
+        if ($eraActual) {
+            $this->volverAlUltimoCursoPagado();
+        }
+
+        $this->olvidarInscripciones();
+    }
+
+    private function volverAlUltimoCursoPagado(): void
+    {
+        $this->inscripciones()
+            ->where('estado_pago', 'aprobado')
+            ->orderByDesc('fecha_inscripcion')
+            ->orderByDesc('id')
+            ->first()
+            ?->update(['es_actual' => true]);
+    }
+
+    /** Las relaciones ya cargadas dejan de ser válidas al cambiar la inscripción. */
+    private function olvidarInscripciones(): void
+    {
+        $this->unsetRelation('inscripcionActual');
+        $this->unsetRelation('ultimaInscripcion');
+        $this->unsetRelation('curso');
     }
 
     /**
@@ -156,9 +236,7 @@ class Estudiante extends Model
      */
     public function cursoActual(): ?Curso
     {
-        $curso = $this->curso_id
-            ? $this->cursos()->whereKey($this->curso_id)->first()
-            : null;
+        $curso = $this->curso()->first();
 
         return $curso?->enCurso() ? $curso : null;
     }
@@ -168,10 +246,25 @@ class Estudiante extends Model
         return $this->belongsTo(User::class);
     }
 
-    /** Curso actual. */
+    /** Curso actual, a través de su inscripción marcada como tal. */
     public function curso()
     {
-        return $this->belongsTo(Curso::class);
+        return $this->hasOneThrough(Curso::class, Inscripcion::class, 'estudiante_id', 'id', 'id', 'curso_id')
+            ->where('inscripciones.es_actual', true)
+            ->where('inscripciones.estado_pago', 'aprobado');
+    }
+
+    public function inscripcionActual()
+    {
+        return $this->hasOne(Inscripcion::class)
+            ->where('es_actual', true)
+            ->where('estado_pago', 'aprobado');
+    }
+
+    /** La inscripción movida más recientemente: su última solicitud. */
+    public function ultimaInscripcion()
+    {
+        return $this->hasOne(Inscripcion::class)->latestOfMany(['updated_at', 'id']);
     }
 
     public function inscripciones()
@@ -184,6 +277,7 @@ class Estudiante extends Model
     {
         return $this->belongsToMany(Curso::class, 'inscripciones')
             ->wherePivot('estado_pago', 'aprobado')
+            ->wherePivotNull('deleted_at')
             ->withPivot('estado_pago', 'estado_aprobacion_curso', 'fecha_inscripcion')
             ->withTimestamps();
     }
