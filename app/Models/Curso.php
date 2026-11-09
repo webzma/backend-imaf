@@ -122,6 +122,23 @@ class Curso extends Model
             ->withTimestamps();
     }
 
+    public function inscripciones()
+    {
+        return $this->hasMany(Inscripcion::class);
+    }
+
+    public function pagos()
+    {
+        return $this->hasManyThrough(
+            Pago::class,
+            Inscripcion::class,
+            'curso_id',
+            'inscripcion_id',
+            'id',
+            'id',
+        );
+    }
+
     public function temario()
     {
         return $this->hasMany(Temario::class)->orderBy('orden');

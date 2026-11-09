@@ -89,7 +89,7 @@ class DashboardController extends Controller
             $inicio = microtime(true);
             $ingresosPorCurso = Curso::withCount([
                 'estudiantes',
-                'estudiantes as pagos_aprobados_count' => fn ($q) => $q->whereHas('user.pagos', fn ($p) => $p->where('estado', 'aprobado')),
+                'pagos as pagos_aprobados_count' => fn ($q) => $q->where('estado', 'aprobado'),
             ])
                 ->where('estado', 'activo')
                 ->get()
@@ -98,6 +98,7 @@ class DashboardController extends Controller
                     'nombre' => $c->nombre,
                     'precio' => $c->precio,
                     'estudiantes' => $c->estudiantes_count,
+                    'pagos_aprobados' => $c->pagos_aprobados_count,
                     'cupos_restantes' => $c->cupos_restantes,
                 ]);
             Log::info('DASHBOARD_DB_FIN', [
