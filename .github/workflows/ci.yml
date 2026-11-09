@@ -1,14 +1,16 @@
 name: CI
 
+# Solo se ejecuta a mano (Actions > CI > Run workflow): la cuenta de GitHub tiene
+# Actions bloqueado por facturación y cada ejecución automática salía en rojo sin
+# llegar a arrancar. Al resolverlo, restaura este bloque:
+#
+# on:
+#   push:
+#     branches: [main, develop]
+#   pull_request:
+#     branches: [main, develop]
 on:
-  push:
-    branches:
-      - main
-      - develop
-  pull_request:
-    branches:
-      - main
-      - develop
+  workflow_dispatch:
 
 jobs:
   lint-and-test:
