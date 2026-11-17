@@ -32,6 +32,7 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-di
     && php artisan view:cache \
     && chown -R www-data:www-data /app
 
+COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/nginx.conf.template /etc/nginx/templates/app.conf.template
 COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
