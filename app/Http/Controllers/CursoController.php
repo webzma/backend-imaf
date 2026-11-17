@@ -6,10 +6,12 @@ use App\Http\Resources\CursoResumenResource;
 use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\Profesor;
+use App\Models\User;
 use App\Notifications\GenericNotification;
 use App\Rules\DiaHabil;
 use App\Services\Auditoria;
 use App\Services\CursoEstadoService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -30,6 +32,8 @@ class CursoController extends Controller
         CursoEstadoService::sincronizarConCache();
 
         $query = Curso::with('instructor.user', 'nivelCurso', 'estudiantes.user');
+
+        $this->acotarAlProfesor($query, $request->user());
 
         if ($search = $this->terminoBusqueda($request)) {
             $query->where(function ($q) use ($search) {
@@ -73,7 +77,7 @@ class CursoController extends Controller
         CursoEstadoService::sincronizarConCache();
 
         return response()->json(
-            Curso::with('instructor.user', 'nivelCurso', 'estudiantes.user')
+            Curso::with('instructor.user', 'nivelCurso')
                 ->where('estado', 'activo')
                 ->latest('id')
                 ->paginate($this->registrosPorPagina($request, self::MAX_PER_PAGE_CATALOGO))
@@ -133,14 +137,26 @@ class CursoController extends Controller
     {
         $curso = Curso::with('instructor.user', 'nivelCurso', 'temario', 'sesiones')->findOrFail($id);
 
+        $usuario = $request->user();
+        $esProfesor = $usuario?->isProfesor() ?? false;
+        $interno = $usuario?->isAdmin() || $esProfesor;
+        $estudiante = $interno ? null : $usuario?->estudiante;
+        $profesorId = $usuario?->profesor?->id;
+
+        if ($esProfesor && (int) $curso->profesor_id !== (int) $profesorId) {
+            abort(404);
+        }
+
+        if (! $interno && (! $estudiante || ! $curso->estudiantes()->whereKey($estudiante->id)->exists())) {
+            abort(404);
+        }
+
         // Admin e instructor ven el listado interno completo: también a
         // quien no ha pagado, está inactivo o fue archivado. El estudiante
-        // (catálogo) solo ve a los inscritos con el pago aprobado.
-        $interno = $request->user()?->isAdmin() || $request->user()?->isProfesor();
-
+        // (catálogo) solo ve su propia inscripción con el pago aprobado.
         $estudiantes = $interno
             ? $curso->matriculas()->withTrashed()->with('user')->get()
-            : $curso->estudiantes()->with('user')->get();
+            : $curso->estudiantes()->with('user')->whereKey($estudiante->id)->get();
 
         // Los campos del estudiante describen su curso actual; en la lista
         // de este curso deben verse los de este curso.
@@ -206,6 +222,15 @@ class CursoController extends Controller
         ]);
 
         return response()->json(['message' => 'Estudiante quitado del curso.']);
+    }
+
+    private function acotarAlProfesor(Builder $query, ?User $usuario): void
+    {
+        if (! $usuario || ! $usuario->isProfesor()) {
+            return;
+        }
+
+        $query->where('profesor_id', $usuario->profesor?->id ?? -1);
     }
 
     /** Un estudiante tal como aparece en el listado interno del curso. */

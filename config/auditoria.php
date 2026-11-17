@@ -33,6 +33,18 @@ return [
         'current_password',
         'secret',
         'foto_cedula',
+        'foto',
+        'cedula',
+        'telefono',
+        'direccion',
+        'fecha_nacimiento',
+        'email',
+        'numero_cuenta',
+        'nombre_titular',
+        'rif',
+        'referencia',
+        'comprobante',
+        'q',
     ],
 
     /*

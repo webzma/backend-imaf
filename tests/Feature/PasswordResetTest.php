@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Notifications\ResetPasswordNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -120,5 +122,42 @@ class PasswordResetTest extends TestCase
         ])->assertStatus(422);
 
         $this->assertSame(1, $user->tokens()->count());
+    }
+
+    public function test_el_correo_de_reset_no_expone_el_token_en_la_url(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create(['email' => 'ana@example.com']);
+
+        $this->postJson('/api/forgot-password', ['email' => $user->email])->assertOk();
+
+        Notification::assertSentTo($user, ResetPasswordNotification::class, function ($notification) use ($user) {
+            $correo = $notification->toMail($user);
+
+            $this->assertStringNotContainsString('token=', $correo->actionUrl);
+            $this->assertStringNotContainsString('email=', $correo->actionUrl);
+            $this->assertStringNotContainsString($notification->token, $correo->actionUrl);
+            $this->assertTrue(collect($correo->introLines)->contains(
+                fn ($linea) => str_contains($linea, $notification->token)
+            ));
+
+            return true;
+        });
+    }
+
+    public function test_la_poda_elimina_tokens_sanctum_caducados(): void
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('viejo');
+        $expira = (int) config('sanctum.expiration', 10080);
+
+        DB::table('personal_access_tokens')
+            ->where('id', $token->accessToken->id)
+            ->update(['created_at' => now()->subMinutes($expira + (25 * 60))]);
+
+        $this->artisan('sanctum:prune-expired --hours=24')->assertSuccessful();
+
+        $this->assertDatabaseMissing('personal_access_tokens', ['id' => $token->accessToken->id]);
     }
 }

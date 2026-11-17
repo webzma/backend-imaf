@@ -188,6 +188,79 @@ class InscripcionTest extends TestCase
         $this->assertSame([$pagado->id], $ids->all());
     }
 
+    public function test_el_profesor_solo_ve_sus_cursos_y_no_puede_filtrar_por_otro(): void
+    {
+        $curso = Curso::factory()->create();
+        $ajeno = Curso::factory()->create();
+
+        Sanctum::actingAs($curso->instructor->user);
+
+        $this->getJson('/api/cursos')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $curso->id);
+
+        $this->getJson('/api/cursos?profesor_id='.$ajeno->profesor_id)
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_el_profesor_no_ve_el_detalle_ni_los_internos_de_un_curso_ajeno(): void
+    {
+        $curso = Curso::factory()->create();
+        $ajeno = Curso::factory()->create();
+        Estudiante::factory()->enCurso($ajeno->id)->create();
+
+        Sanctum::actingAs($curso->instructor->user);
+
+        $this->getJson("/api/cursos/{$ajeno->id}")->assertNotFound();
+        $this->getJson("/api/cursos/{$curso->id}")->assertOk();
+
+        Sanctum::actingAs($this->admin);
+
+        $this->getJson("/api/cursos/{$ajeno->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'estudiantes');
+    }
+
+    public function test_estudiante_no_ve_el_detalle_de_un_curso_ajeno(): void
+    {
+        $curso = Curso::factory()->create();
+        $ajeno = Curso::factory()->create();
+        $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
+
+        Sanctum::actingAs($estudiante->user);
+
+        $this->getJson("/api/estudiante/cursos/{$ajeno->id}")->assertNotFound();
+        $this->getJson("/api/estudiante/cursos/{$curso->id}")->assertOk();
+    }
+
+    public function test_estudiante_solo_ve_su_propia_inscripcion_en_el_detalle(): void
+    {
+        $curso = Curso::factory()->create();
+        $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
+        Estudiante::factory()->enCurso($curso->id)->create();
+
+        Sanctum::actingAs($estudiante->user);
+
+        $this->getJson("/api/estudiante/cursos/{$curso->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'estudiantes')
+            ->assertJsonPath('estudiantes.0.id', $estudiante->id);
+    }
+
+    public function test_catalogo_de_estudiante_no_expone_los_inscritos(): void
+    {
+        $curso = Curso::factory()->create();
+        Estudiante::factory()->enCurso($curso->id)->create();
+        $otro = Estudiante::factory()->create();
+
+        Sanctum::actingAs($otro->user);
+
+        $res = $this->getJson('/api/estudiante/cursos')->assertOk();
+        $this->assertArrayNotHasKey('estudiantes', $res->json('data.0'));
+    }
+
     public function test_admin_inscribe_y_quita_estudiantes_desde_el_curso(): void
     {
         $anterior = Curso::factory()->create();

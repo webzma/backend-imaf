@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Bitacora;
 use App\Models\Curso;
+use App\Models\DatoBancario;
 use App\Models\Estudiante;
 use App\Models\Pago;
 use App\Models\Profesor;
@@ -98,6 +99,64 @@ class BitacoraTest extends TestCase
         $this->assertSame('[oculto]', $cambio->cambios['despues']['password']);
         $this->assertNotNull($this->ultimo('auth.contrasena_cambiada'));
         $this->assertStringNotContainsString('nueva-clave-123', Bitacora::all()->toJson());
+    }
+
+    public function test_no_guarda_datos_personales_en_los_cambios(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        $estudiante = Estudiante::factory()->create([
+            'cedula' => '00123456',
+            'telefono' => '8090000000',
+            'direccion' => 'Calle Falsa 123',
+            'foto_cedula' => 'https://ejemplo.test/cedula.jpg',
+        ]);
+
+        $estudiante->update(['telefono' => '8091111111']);
+
+        $cambio = $this->ultimo('estudiante.actualizado');
+
+        $this->assertSame('[oculto]', $cambio->cambios['antes']['telefono']);
+        $this->assertSame('[oculto]', $cambio->cambios['despues']['telefono']);
+        $this->assertStringNotContainsString('00123456', Bitacora::all()->toJson());
+        $this->assertStringNotContainsString('Calle Falsa 123', Bitacora::all()->toJson());
+        $this->assertStringNotContainsString('https://ejemplo.test/cedula.jpg', Bitacora::all()->toJson());
+    }
+
+    public function test_no_guarda_datos_bancarios_en_los_cambios(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        $datos = DatoBancario::create([
+            'tipo' => 'bak',
+            'rif' => 'J-123456789',
+            'banco' => 'Banco Prueba',
+            'telefono' => '8090000000',
+            'concepto' => 'Inscripción',
+            'numero_cuenta' => '000123456789',
+            'nombre_titular' => 'Ana Pérez',
+        ]);
+
+        $datos->update(['numero_cuenta' => '987654321']);
+
+        $cambio = $this->ultimo('dato_bancario.actualizado');
+
+        $this->assertSame('[oculto]', $cambio->cambios['antes']['numero_cuenta']);
+        $this->assertSame('[oculto]', $cambio->cambios['despues']['numero_cuenta']);
+        $this->assertStringNotContainsString('J-123456789', Bitacora::all()->toJson());
+        $this->assertStringNotContainsString('000123456789', Bitacora::all()->toJson());
+        $this->assertStringNotContainsString('Ana Pérez', Bitacora::all()->toJson());
+    }
+
+    public function test_no_guarda_correos_en_descripciones_ni_metadatos(): void
+    {
+        $this->postJson('/api/forgot-password', ['email' => 'ana@example.com'])->assertOk();
+
+        $evento = $this->ultimo('auth.recuperacion_solicitada');
+
+        $this->assertSame('[oculto]', $evento->metadatos['email']);
+        $this->assertStringNotContainsString('ana@example.com', $evento->descripcion);
+        $this->assertStringContainsString('[correo]', $evento->descripcion);
     }
 
     /* ── Autenticación y seguridad ── */

@@ -60,12 +60,13 @@ class Auditoria
                 ? $opciones['actor']
                 : (self::$comoSistema ? false : Auth::user());
             [$entidad, $entidadId, $etiqueta] = self::entidad($opciones['entidad'] ?? null);
+            $etiqueta = $etiqueta === null ? null : self::mascararCorreos((string) $etiqueta);
 
             $registro = new Bitacora([
                 'evento' => $evento,
                 'categoria' => $opciones['categoria'] ?? self::categoria($evento),
                 'nivel' => $opciones['nivel'] ?? 'info',
-                'descripcion' => Str::limit($descripcion, 497),
+                'descripcion' => Str::limit(self::mascararCorreos($descripcion), 497),
                 'actor_id' => $actor instanceof User ? $actor->id : null,
                 'actor_nombre' => $actor instanceof User ? $actor->name : ($actor === false ? 'Sistema' : null),
                 'actor_rol' => $actor instanceof User ? $actor->role : null,
@@ -155,6 +156,11 @@ class Auditoria
         }
 
         return $datos;
+    }
+
+    private static function mascararCorreos(string $texto): string
+    {
+        return preg_replace('/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i', '[correo]', $texto) ?? $texto;
     }
 
     private static function normalizar(?array $datos): ?array
