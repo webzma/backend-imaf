@@ -3,6 +3,7 @@
 .env
 .env.*
 !.env.example
+*.sql
 vendor
 node_modules
 storage/logs/*
