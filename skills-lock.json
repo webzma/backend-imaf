@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "skills": {
+    "auditor-security": {
+      "source": "Emcahell/auditor-security-skill",
+      "commit": "0117394073a5d1715b26d3909a3ed623f748f88d",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "a71e947a85eb4852faacd20582695e91edebd3606a5f94a54801c41228c9698f"
+    }
+  }
+}
