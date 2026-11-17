@@ -1,0 +1,35 @@
+pid /tmp/nginx/nginx.pid;
+
+server {
+    listen ${PORT};
+    server_name _;
+
+    root /app/public;
+    index index.php;
+
+    client_max_body_size 12M;
+
+    client_body_temp_path /tmp/nginx/client_body;
+    fastcgi_temp_path /tmp/nginx/fastcgi;
+    proxy_temp_path /tmp/nginx/proxy;
+    scgi_temp_path /tmp/nginx/scgi;
+    uwsgi_temp_path /tmp/nginx/uwsgi;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_read_timeout 300;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+
+    access_log /dev/stdout;
+    error_log /dev/stderr warn;
+}
