@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -134,15 +135,42 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
+        $clave = $this->claveBloqueo($request);
+        $intentosMaximos = max(1, (int) config('auth.lockout.intentos', 5));
+        $minutos = max(1, (int) config('auth.lockout.minutos', 15));
+
+        if (RateLimiter::tooManyAttempts($clave, $intentosMaximos)) {
+            throw ValidationException::withMessages([
+                'email' => ["Demasiados intentos fallidos. Intenta de nuevo en {$minutos} minutos."],
+            ]);
+        }
+
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
+            RateLimiter::hit($clave, $minutos * 60);
+
+            if (RateLimiter::attempts($clave) === $intentosMaximos) {
+                Auditoria::registrar('auth.cuenta_bloqueada', 'Cuenta bloqueada por intentos fallidos', [
+                    'actor' => null,
+                    'nivel' => 'critico',
+                    'entidad' => $user,
+                    'metadatos' => [
+                        'email' => $request->input('email'),
+                        'intentos' => $intentosMaximos,
+                        'minutos' => $minutos,
+                    ],
+                ]);
+            }
+
             $this->auditarLoginFallido($request, $user);
 
             throw ValidationException::withMessages([
                 'email' => ['Las credenciales son incorrectas.'],
             ]);
         }
+
+        RateLimiter::clear($clave);
 
         // Sesión única: al iniciar sesión se revocan los tokens anteriores,
         // por lo que cualquier otra sesión activa del usuario queda invalidada.
@@ -161,6 +189,11 @@ class AuthController extends Controller
             'user' => $user,
             'token' => $token,
         ]);
+    }
+
+    private function claveBloqueo(Request $request): string
+    {
+        return 'auth:bloqueo:'.sha1(strtolower((string) $request->input('email')));
     }
 
     /**

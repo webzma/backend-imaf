@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\Bitacora;
 use App\Models\User;
 use Cloudinary\Api\ApiResponse;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -188,6 +190,35 @@ class AuthTest extends TestCase
         ]);
 
         $response->assertStatus(422)->assertJsonValidationErrors('email');
+    }
+
+    public function test_bloquea_la_cuenta_tras_intentos_fallidos_y_la_libera_al_expirar(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'ana@example.com',
+            'password' => Hash::make('clave-correcta'),
+        ]);
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->postJson('/api/login', [
+                'email' => $user->email,
+                'password' => 'clave-incorrecta',
+            ])->assertStatus(422);
+        }
+
+        $this->assertNotNull(Bitacora::where('evento', 'auth.cuenta_bloqueada')->first());
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'clave-correcta',
+        ])->assertStatus(422)->assertJsonValidationErrors('email');
+
+        $this->travel(16)->minutes();
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'clave-correcta',
+        ])->assertOk();
     }
 
     public function test_me_requiere_autenticacion(): void

@@ -19,9 +19,15 @@ use App\Http\Controllers\TemarioController;
 use Illuminate\Support\Facades\Route;
 
 // Rutas públicas
-Route::middleware('throttle:10,1')->group(function () {
+Route::middleware('throttle:registro')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
+});
+
+Route::middleware('throttle:login')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
+});
+
+Route::middleware('throttle:recuperacion')->group(function () {
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 });

@@ -24,14 +24,9 @@ class ResetPasswordNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $frontendUrl = rtrim(config('app.frontend_url'), '/');
+        $frontendUrl = rtrim((string) config('app.frontend_url'), '/');
 
-        $url = sprintf(
-            '%s/reset-password?token=%s&email=%s',
-            $frontendUrl,
-            $this->token,
-            urlencode($notifiable->getEmailForPasswordReset()),
-        );
+        $url = $frontendUrl.'/reset-password';
 
         $expira = config('auth.passwords.'.config('auth.defaults.passwords').'.expire', 60);
 
@@ -39,8 +34,9 @@ class ResetPasswordNotification extends Notification
             ->subject('Restablece tu contraseña · IMAF')
             ->greeting('Hola '.$notifiable->name)
             ->line('Recibimos una solicitud para restablecer la contraseña de tu cuenta.')
+            ->line('Tu código de restablecimiento es: '.$this->token)
             ->action('Restablecer contraseña', $url)
-            ->line(sprintf('Este enlace expira en %d minutos.', $expira))
+            ->line(sprintf('Este código expira en %d minutos.', $expira))
             ->line('Si no solicitaste este cambio, puedes ignorar este correo; tu contraseña seguirá siendo la misma.');
     }
 }
