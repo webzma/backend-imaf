@@ -242,6 +242,10 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
+        if (! $user instanceof User) {
+            abort(401);
+        }
+
         $data = $request->validate([
             'primer_nombre' => ['sometimes', 'required', 'string', 'max:100', self::REGEX_NOMBRES],
             'segundo_nombre' => ['nullable', 'string', 'max:100', self::REGEX_NOMBRES],
@@ -270,6 +274,7 @@ class AuthController extends Controller
         $user->save();
 
         if ($cambioContrasena ?? false) {
+            $user->tokens()->delete();
             Auditoria::registrar('auth.contrasena_cambiada', "Cambio de contraseña de {$user->email}", [
                 'entidad' => $user,
             ]);

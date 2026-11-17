@@ -54,6 +54,27 @@ class PerfilPropioTest extends TestCase
         $this->assertTrue(Hash::check('contrasena-nueva', $admin->fresh()->password));
     }
 
+    public function test_cambiar_la_contrasena_cierra_las_sesiones_abiertas(): void
+    {
+        $user = User::factory()->create(['password' => Hash::make('contrasena-vieja')]);
+        $tokenActual = $user->createToken('principal')->plainTextToken;
+        $tokenRobado = $user->createToken('otra_sesion')->plainTextToken;
+
+        $this->withToken($tokenActual)->putJson('/api/me', [
+            'password_actual' => 'contrasena-vieja',
+            'password' => 'contrasena-nueva',
+            'password_confirmation' => 'contrasena-nueva',
+        ])->assertOk();
+
+        $this->assertSame(0, $user->tokens()->count());
+
+        auth()->forgetGuards();
+        $this->withToken($tokenActual)->getJson('/api/me')->assertUnauthorized();
+
+        auth()->forgetGuards();
+        $this->withToken($tokenRobado)->getJson('/api/me')->assertUnauthorized();
+    }
+
     public function test_no_se_puede_tomar_el_correo_de_otra_persona(): void
     {
         User::factory()->create(['email' => 'ocupado@imaf.test']);
