@@ -73,7 +73,7 @@ class CursoController extends Controller
         CursoEstadoService::sincronizarConCache();
 
         return response()->json(
-            Curso::with('instructor.user', 'nivelCurso', 'estudiantes.user')
+            Curso::with('instructor.user', 'nivelCurso')
                 ->where('estado', 'activo')
                 ->latest('id')
                 ->paginate($this->registrosPorPagina($request, self::MAX_PER_PAGE_CATALOGO))
@@ -133,14 +133,20 @@ class CursoController extends Controller
     {
         $curso = Curso::with('instructor.user', 'nivelCurso', 'temario', 'sesiones')->findOrFail($id);
 
+        $usuario = $request->user();
+        $interno = $usuario?->isAdmin() || $usuario?->isProfesor();
+        $estudiante = $interno ? null : $usuario?->estudiante;
+
+        if (! $interno && (! $estudiante || ! $curso->estudiantes()->whereKey($estudiante->id)->exists())) {
+            abort(404);
+        }
+
         // Admin e instructor ven el listado interno completo: también a
         // quien no ha pagado, está inactivo o fue archivado. El estudiante
-        // (catálogo) solo ve a los inscritos con el pago aprobado.
-        $interno = $request->user()?->isAdmin() || $request->user()?->isProfesor();
-
+        // (catálogo) solo ve su propia inscripción con el pago aprobado.
         $estudiantes = $interno
             ? $curso->matriculas()->withTrashed()->with('user')->get()
-            : $curso->estudiantes()->with('user')->get();
+            : $curso->estudiantes()->with('user')->whereKey($estudiante->id)->get();
 
         // Los campos del estudiante describen su curso actual; en la lista
         // de este curso deben verse los de este curso.
