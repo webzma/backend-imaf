@@ -50,7 +50,7 @@ class CatalogoTest extends TestCase
     public function test_el_listado_indica_cuantos_instructores_lo_usan(): void
     {
         $profesor = Profesor::factory()->create();
-        $especialidad = Especialidad::findOrFail($profesor->especialidad_id);
+        $especialidad = Especialidad::query()->findOrFail($profesor->especialidad_id);
 
         $item = collect($this->getJson('/api/admin/especialidades')->assertOk()->json())
             ->firstWhere('id', $especialidad->id);
@@ -71,7 +71,7 @@ class CatalogoTest extends TestCase
 
     public function test_el_catalogo_de_niveles_indica_cuantos_cursos_lo_usan(): void
     {
-        $nivel = NivelCurso::create(['nombre' => 'Intermedio']);
+        $nivel = NivelCurso::query()->create(['nombre' => 'Intermedio']);
         Curso::factory()->create(['nivel_curso_id' => $nivel->id]);
 
         $item = collect($this->getJson('/api/admin/niveles-cursos')->assertOk()->json())

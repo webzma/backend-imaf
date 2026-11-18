@@ -374,7 +374,7 @@ class InscripcionTest extends TestCase
         $curso = Curso::factory()->create();
         $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
         // Datos antiguos: curso actual con la inscripción sin pagar.
-        Inscripcion::where('estudiante_id', $estudiante->id)->update(['estado_pago' => 'rechazado']);
+        Inscripcion::query()->where('estudiante_id', $estudiante->id)->update(['estado_pago' => 'rechazado']);
 
         Sanctum::actingAs($estudiante->user);
         $this->assertNull($this->getJson('/api/estudiante/perfil')->json('curso'));
@@ -460,7 +460,7 @@ class InscripcionTest extends TestCase
             [$primero->id, $segundo->id],
             $estudiante->cursos()->pluck('cursos.id')->all(),
         );
-        $this->assertSame('aprobado', Inscripcion::where('curso_id', $primero->id)->value('estado_aprobacion_curso'));
+        $this->assertSame('aprobado', Inscripcion::query()->where('curso_id', $primero->id)->value('estado_aprobacion_curso'));
     }
 
     public function test_el_cupo_cuenta_a_quien_paso_a_otro_curso(): void
@@ -489,7 +489,7 @@ class InscripcionTest extends TestCase
 
         $this->assertSame('aprobado', $estudiante->fresh()->estado_pago);
 
-        $this->resolverPago(Pago::latest('id')->first(), 'rechazado')->assertOk();
+        $this->resolverPago(Pago::query()->latest('id')->firstOrFail(), 'rechazado')->assertOk();
 
         $this->assertSame('aprobado', $estudiante->fresh()->estado_pago);
         $this->assertSame($actual->id, $estudiante->fresh()->curso_id);

@@ -9,6 +9,7 @@ use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -23,6 +24,10 @@ class AuthTest extends TestCase
         );
     }
 
+    /**
+     * @param  array<string, mixed>  $datos
+     * @return TestResponse
+     */
     private function postRegistro(array $datos)
     {
         return $this->post('/api/register', array_merge($datos, [
@@ -206,7 +211,7 @@ class AuthTest extends TestCase
             ])->assertStatus(422);
         }
 
-        $this->assertNotNull(Bitacora::where('evento', 'auth.cuenta_bloqueada')->first());
+        $this->assertNotNull(Bitacora::query()->where('evento', 'auth.cuenta_bloqueada')->first());
 
         $this->postJson('/api/login', [
             'email' => $user->email,

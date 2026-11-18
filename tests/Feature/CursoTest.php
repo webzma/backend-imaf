@@ -79,6 +79,10 @@ class CursoTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors('profesor_id');
     }
 
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
     private function payloadCurso(array $overrides = []): array
     {
         $profesor = Profesor::factory()->create();
@@ -210,7 +214,7 @@ class CursoTest extends TestCase
         Notification::fake();
         $this->actingAsAdmin();
         $profesor = Profesor::factory()->create();
-        $nivel = NivelCurso::create(['nombre' => 'Básico']);
+        $nivel = NivelCurso::query()->create(['nombre' => 'Básico']);
 
         $this->postJson('/api/admin/cursos', [
             'profesor_id' => $profesor->id,
@@ -239,7 +243,7 @@ class CursoTest extends TestCase
     {
         $this->actingAsAdmin();
         $curso = Curso::factory()->create();
-        $nivel = NivelCurso::create(['nombre' => 'Avanzado']);
+        $nivel = NivelCurso::query()->create(['nombre' => 'Avanzado']);
 
         $this->putJson("/api/admin/cursos/{$curso->id}", [
             'nivel_curso_id' => $nivel->id,
