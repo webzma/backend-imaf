@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Contracts\Database\Query\Builder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 abstract class Controller
@@ -53,6 +53,8 @@ abstract class Controller
     /**
      * Mensajes en español para las reglas de tipo de dato
      * de los campos comunes de los formularios.
+     *
+     * @return array<string, string>
      */
     protected function mensajesTipoDato(): array
     {
@@ -71,6 +73,8 @@ abstract class Controller
 
     /**
      * Mensajes en español para la imagen de la cédula de identidad.
+     *
+     * @return array<string, string>
      */
     protected function mensajesFotoCedula(): array
     {
@@ -91,6 +95,11 @@ abstract class Controller
      * real (o un closure que ordena por una relación).
      *
      * @param  array<string, string|callable>  $columnas
+     *
+     * @phpstan-param  Builder  $query
+     * @phpstan-param  Request  $request
+     * @phpstan-param  string  $porDefecto
+     * @phpstan-param  string  $direccionPorDefecto
      */
     protected function aplicarOrden(
         Builder $query,

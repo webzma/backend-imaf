@@ -34,7 +34,7 @@ class BitacoraTest extends TestCase
 
     private function ultimo(string $evento): ?Bitacora
     {
-        return Bitacora::where('evento', $evento)->orderByDesc('created_at')->first();
+        return Bitacora::query()->where('evento', $evento)->orderByDesc('created_at')->first();
     }
 
     /* ── Captura automática de cambios ── */
@@ -77,11 +77,11 @@ class BitacoraTest extends TestCase
     public function test_un_guardado_sin_cambios_reales_no_genera_registro(): void
     {
         $curso = Curso::factory()->create();
-        $antes = Bitacora::count();
+        $antes = Bitacora::query()->count();
 
         $curso->touch();
 
-        $this->assertSame($antes, Bitacora::count());
+        $this->assertSame($antes, Bitacora::query()->count());
     }
 
     public function test_nunca_guarda_contrasenas(): void
@@ -98,7 +98,7 @@ class BitacoraTest extends TestCase
         $this->assertSame('[oculto]', $cambio->cambios['antes']['password']);
         $this->assertSame('[oculto]', $cambio->cambios['despues']['password']);
         $this->assertNotNull($this->ultimo('auth.contrasena_cambiada'));
-        $this->assertStringNotContainsString('nueva-clave-123', Bitacora::all()->toJson());
+        $this->assertStringNotContainsString('nueva-clave-123', Bitacora::query()->get()->toJson());
     }
 
     public function test_no_guarda_datos_personales_en_los_cambios(): void
@@ -118,16 +118,16 @@ class BitacoraTest extends TestCase
 
         $this->assertSame('[oculto]', $cambio->cambios['antes']['telefono']);
         $this->assertSame('[oculto]', $cambio->cambios['despues']['telefono']);
-        $this->assertStringNotContainsString('00123456', Bitacora::all()->toJson());
-        $this->assertStringNotContainsString('Calle Falsa 123', Bitacora::all()->toJson());
-        $this->assertStringNotContainsString('https://ejemplo.test/cedula.jpg', Bitacora::all()->toJson());
+        $this->assertStringNotContainsString('00123456', Bitacora::query()->get()->toJson());
+        $this->assertStringNotContainsString('Calle Falsa 123', Bitacora::query()->get()->toJson());
+        $this->assertStringNotContainsString('https://ejemplo.test/cedula.jpg', Bitacora::query()->get()->toJson());
     }
 
     public function test_no_guarda_datos_bancarios_en_los_cambios(): void
     {
         Sanctum::actingAs($this->admin);
 
-        $datos = DatoBancario::create([
+        $datos = DatoBancario::query()->create([
             'tipo' => 'bak',
             'rif' => 'J-123456789',
             'banco' => 'Banco Prueba',
@@ -143,9 +143,9 @@ class BitacoraTest extends TestCase
 
         $this->assertSame('[oculto]', $cambio->cambios['antes']['numero_cuenta']);
         $this->assertSame('[oculto]', $cambio->cambios['despues']['numero_cuenta']);
-        $this->assertStringNotContainsString('J-123456789', Bitacora::all()->toJson());
-        $this->assertStringNotContainsString('000123456789', Bitacora::all()->toJson());
-        $this->assertStringNotContainsString('Ana Pérez', Bitacora::all()->toJson());
+        $this->assertStringNotContainsString('J-123456789', Bitacora::query()->get()->toJson());
+        $this->assertStringNotContainsString('000123456789', Bitacora::query()->get()->toJson());
+        $this->assertStringNotContainsString('Ana Pérez', Bitacora::query()->get()->toJson());
     }
 
     public function test_no_guarda_correos_en_descripciones_ni_metadatos(): void
@@ -175,7 +175,7 @@ class BitacoraTest extends TestCase
         $this->assertNull($fallo->actor_id);
         $this->assertSame('aviso', $fallo->nivel);
         $this->assertSame('contrasena_incorrecta', $fallo->metadatos['motivo']);
-        $this->assertStringNotContainsString('mala-clave', json_encode($fallo->toArray()));
+        $this->assertStringNotContainsString('mala-clave', (string) json_encode($fallo->toArray()));
     }
 
     public function test_varios_fallos_desde_la_misma_ip_suben_a_critico(): void
@@ -230,8 +230,8 @@ class BitacoraTest extends TestCase
         $this->assertEquals(80, $aprobado->metadatos['monto']);
         $this->assertSame('negocio', $aprobado->categoria);
         // El mismo id agrupa el cambio del pago y el de la inscripción.
-        $this->assertTrue(Bitacora::where('solicitud_id', $solicitud)->where('evento', 'pago.actualizado')->exists());
-        $this->assertTrue(Bitacora::where('solicitud_id', $solicitud)->where('evento', 'inscripcion.actualizado')->exists());
+        $this->assertTrue(Bitacora::query()->where('solicitud_id', $solicitud)->where('evento', 'pago.actualizado')->exists());
+        $this->assertTrue(Bitacora::query()->where('solicitud_id', $solicitud)->where('evento', 'inscripcion.actualizado')->exists());
     }
 
     public function test_respeta_un_x_request_id_valido_del_cliente(): void
@@ -398,7 +398,7 @@ class BitacoraTest extends TestCase
         $csv = $respuesta->streamedContent();
 
         $this->assertStringContainsString('Pago de prueba «ñandú»', $csv);
-        $this->assertStringContainsString('text/csv', $respuesta->headers->get('Content-Type'));
+        $this->assertStringContainsString('text/csv', (string) $respuesta->headers->get('Content-Type'));
         $this->assertNotNull($this->ultimo('bitacora.exportada'));
     }
 
@@ -413,7 +413,7 @@ class BitacoraTest extends TestCase
 
         $this->artisan('bitacora:depurar', ['--dias' => 365])->assertSuccessful();
 
-        $descripciones = Bitacora::where('evento', 'sistema.prueba')->pluck('descripcion')->all();
+        $descripciones = Bitacora::query()->where('evento', 'sistema.prueba')->pluck('descripcion')->all();
         $this->assertSame(['Reciente'], $descripciones);
         $this->assertSame(1, $this->ultimo('bitacora.depurada')->metadatos['borrados']);
     }

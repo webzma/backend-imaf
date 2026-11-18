@@ -7,6 +7,7 @@ use App\Services\Auditoria;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -23,8 +24,7 @@ class BitacoraController extends Controller
     {
         $filtros = $this->filtros($request);
 
-        $registros = Bitacora::query()
-            ->filtrar($filtros)
+        $registros = Bitacora::consulta($filtros)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate($this->registrosPorPagina($request));
@@ -37,14 +37,14 @@ class BitacoraController extends Controller
     /** Un registro con su detalle completo y si su huella es válida. */
     public function show(string $id)
     {
-        $registro = Bitacora::findOrFail($id);
+        $registro = Bitacora::query()->findOrFail($id);
 
         return response()->json([
             ...$this->formato($registro, detalle: true),
             'integridad' => $registro->huellaValida() ? 'valida' : 'alterada',
             // Otros eventos de la misma petición, para ver el contexto.
             'relacionados' => $registro->solicitud_id
-                ? Bitacora::where('solicitud_id', $registro->solicitud_id)
+                ? Bitacora::query()->where('solicitud_id', $registro->solicitud_id)
                     ->whereKeyNot($registro->id)
                     ->orderBy('created_at')
                     ->limit(50)
@@ -57,7 +57,7 @@ class BitacoraController extends Controller
     /** Historial completo de una entidad (p. ej. /entidades/curso/5). */
     public function historial(Request $request, string $entidad, string $id)
     {
-        $registros = Bitacora::where('entidad', $entidad)
+        $registros = Bitacora::query()->where('entidad', $entidad)
             ->where('entidad_id', $id)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
@@ -74,7 +74,7 @@ class BitacoraController extends Controller
         $hace24h = now()->subDay();
         $hace7d = now()->subDays(7);
 
-        $porDia = Bitacora::where('created_at', '>=', now()->subDays(13)->startOfDay())
+        $porDia = Bitacora::query()->where('created_at', '>=', now()->subDays(13)->startOfDay())
             ->get(['created_at', 'nivel'])
             ->groupBy(fn (Bitacora $b) => $b->created_at->toDateString())
             ->map(fn ($grupo) => [
@@ -89,29 +89,29 @@ class BitacoraController extends Controller
         });
 
         return response()->json([
-            'total' => Bitacora::count(),
-            'ultimas_24h' => Bitacora::where('created_at', '>=', $hace24h)->count(),
+            'total' => Bitacora::query()->count(),
+            'ultimas_24h' => Bitacora::query()->where('created_at', '>=', $hace24h)->count(),
             'por_categoria_7d' => $this->conteo('categoria', $hace7d),
             'por_nivel_7d' => $this->conteo('nivel', $hace7d),
-            'logins_fallidos_24h' => Bitacora::where('evento', 'auth.login_fallido')
+            'logins_fallidos_24h' => Bitacora::query()->where('evento', 'auth.login_fallido')
                 ->where('created_at', '>=', $hace24h)->count(),
-            'accesos_denegados_24h' => Bitacora::where('evento', 'seguridad.acceso_denegado')
+            'accesos_denegados_24h' => Bitacora::query()->where('evento', 'seguridad.acceso_denegado')
                 ->where('created_at', '>=', $hace24h)->count(),
-            'ips_con_mas_fallos_24h' => Bitacora::where('evento', 'auth.login_fallido')
+            'ips_con_mas_fallos_24h' => Bitacora::query()->where('evento', 'auth.login_fallido')
                 ->where('created_at', '>=', $hace24h)
                 ->select('ip', DB::raw('COUNT(*) as total'))
                 ->groupBy('ip')
                 ->orderByDesc('total')
                 ->limit(5)
                 ->get(),
-            'actores_mas_activos_7d' => Bitacora::whereNotNull('actor_id')
+            'actores_mas_activos_7d' => Bitacora::query()->whereNotNull('actor_id')
                 ->where('created_at', '>=', $hace7d)
                 ->select('actor_id', 'actor_nombre', 'actor_rol', DB::raw('COUNT(*) as total'))
                 ->groupBy('actor_id', 'actor_nombre', 'actor_rol')
                 ->orderByDesc('total')
                 ->limit(5)
                 ->get(),
-            'criticos_recientes' => Bitacora::where('nivel', 'critico')
+            'criticos_recientes' => Bitacora::query()->where('nivel', 'critico')
                 ->orderByDesc('created_at')
                 ->limit(10)
                 ->get()
@@ -136,7 +136,7 @@ class BitacoraController extends Controller
     {
         $filtros = $this->filtros($request);
         $maximo = (int) config('auditoria.max_exportacion', 50000);
-        $total = Bitacora::query()->filtrar($filtros)->count();
+        $total = Bitacora::consulta($filtros)->count();
 
         Auditoria::registrar('bitacora.exportada', 'Exportación de la bitácora ('.min($total, $maximo).' registros)', [
             'nivel' => 'aviso',
@@ -147,6 +147,11 @@ class BitacoraController extends Controller
 
         return response()->streamDownload(function () use ($filtros, $maximo) {
             $salida = fopen('php://output', 'w');
+
+            if ($salida === false) {
+                throw new RuntimeException('No se pudo abrir la salida para el CSV.');
+            }
+
             fwrite($salida, "\xEF\xBB\xBF");
             fputcsv($salida, [
                 'Fecha', 'Evento', 'Categoría', 'Nivel', 'Descripción', 'Actor', 'Rol',
@@ -154,8 +159,7 @@ class BitacoraController extends Controller
             ]);
 
             $escritos = 0;
-            Bitacora::query()
-                ->filtrar($filtros)
+            Bitacora::consulta($filtros)
                 ->orderByDesc('created_at')
                 ->orderByDesc('id')
                 ->lazy(500)
@@ -236,7 +240,7 @@ class BitacoraController extends Controller
     /** @return array<string, mixed> */
     private function conteo(string $campo, Carbon $desde): array
     {
-        return Bitacora::where('created_at', '>=', $desde)
+        return Bitacora::query()->where('created_at', '>=', $desde)
             ->select($campo, DB::raw('COUNT(*) as total'))
             ->groupBy($campo)
             ->pluck('total', $campo)

@@ -40,7 +40,7 @@ class TemarioTest extends TestCase
     public function test_orden_se_autoincrementa_cuando_no_se_envia(): void
     {
         $curso = Curso::factory()->create();
-        Temario::create(['curso_id' => $curso->id, 'titulo' => 'Tema A', 'orden' => 5]);
+        Temario::query()->create(['curso_id' => $curso->id, 'titulo' => 'Tema A', 'orden' => 5]);
 
         $response = $this->postJson("/api/admin/cursos/{$curso->id}/temario", [
             'titulo' => 'Tema B',
@@ -52,7 +52,7 @@ class TemarioTest extends TestCase
     public function test_admin_puede_eliminar_un_tema(): void
     {
         $curso = Curso::factory()->create();
-        $tema = Temario::create(['curso_id' => $curso->id, 'titulo' => 'Borrar', 'orden' => 1]);
+        $tema = Temario::query()->create(['curso_id' => $curso->id, 'titulo' => 'Borrar', 'orden' => 1]);
 
         $this->deleteJson("/api/admin/cursos/{$curso->id}/temario/{$tema->id}")
             ->assertOk();

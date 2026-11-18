@@ -5,34 +5,35 @@ namespace App\Http\Controllers;
 use App\Models\Asistencia;
 use App\Models\Estudiante;
 use App\Models\Sesion;
+use App\Models\User;
 use App\Services\Auditoria;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 class AsistenciaController extends Controller
 {
-    public function show(string $sesionId)
+    /** Devuelve el detalle de asistencia de una sesión.
+     *
+     * @return JsonResponse
+     */
+    public function show(Request $request, string $sesionId)
     {
         $sesion = Sesion::with('curso:id,nombre,profesor_id')->findOrFail($sesionId);
 
-        $authUser = Auth::user();
-        if ($authUser->isProfesor()) {
-            if ((int) $sesion->curso->profesor_id !== (int) $authUser->profesor->id) {
-                Auditoria::registrar('seguridad.acceso_denegado', "Intento de acceder a la asistencia de una sesión de un curso ajeno (#{$sesion->id})", [
-                    'nivel' => 'aviso',
-                    'metadatos' => ['sesion_id' => $sesion->id, 'curso_id' => $sesion->curso_id],
-                ]);
-
-                return response()->json(['message' => 'No autorizado.'], 403);
-            }
+        if ($this->accesoProfesorDenegado($request->user(), $sesion)) {
+            return response()->json(['message' => 'No autorizado.'], 403);
         }
 
-        $estudiantes = Estudiante::whereHas('cursos', fn ($c) => $c->whereKey($sesion->curso_id))
+        $estudiantes = Estudiante::query()
+            ->whereHas('cursos', fn (Builder $c) => $c->whereKey($sesion->curso_id))
             ->select('id', 'nombre', 'cedula', 'foto')
             ->get();
 
-        $asistencias = Asistencia::where('sesion_id', $sesionId)
+        $asistencias = Asistencia::query()
+            ->where('sesion_id', $sesionId)
             ->get()
             ->keyBy('estudiante_id');
 
@@ -64,20 +65,16 @@ class AsistenciaController extends Controller
         ]);
     }
 
+    /** Guarda la asistencia de una sesión.
+     *
+     * @return JsonResponse
+     */
     public function store(Request $request, string $sesionId)
     {
         $sesion = Sesion::with('curso:id,profesor_id')->findOrFail($sesionId);
 
-        $authUser = Auth::user();
-        if ($authUser->isProfesor()) {
-            if ((int) $sesion->curso->profesor_id !== (int) $authUser->profesor->id) {
-                Auditoria::registrar('seguridad.acceso_denegado', "Intento de acceder a la asistencia de una sesión de un curso ajeno (#{$sesion->id})", [
-                    'nivel' => 'aviso',
-                    'metadatos' => ['sesion_id' => $sesion->id, 'curso_id' => $sesion->curso_id],
-                ]);
-
-                return response()->json(['message' => 'No autorizado.'], 403);
-            }
+        if ($this->accesoProfesorDenegado($request->user(), $sesion)) {
+            return response()->json(['message' => 'No autorizado.'], 403);
         }
 
         $data = $request->validate([
@@ -104,7 +101,7 @@ class AsistenciaController extends Controller
             'created_at' => now(),
         ])->all();
 
-        Asistencia::upsert(
+        Asistencia::query()->upsert(
             $registros,
             ['sesion_id', 'estudiante_id'],
             ['presente', 'observacion', 'updated_at']
@@ -122,5 +119,26 @@ class AsistenciaController extends Controller
         ]);
 
         return response()->json(['message' => 'Asistencia guardada.']);
+    }
+
+    private function accesoProfesorDenegado(?Authenticatable $authUser, Sesion $sesion): bool
+    {
+        if (! $authUser instanceof User || ! $authUser->isProfesor()) {
+            return false;
+        }
+
+        $profesorId = $authUser->profesor?->id;
+        $cursoProfesorId = $sesion->curso?->profesor_id;
+
+        if ($profesorId !== null && (int) $cursoProfesorId === (int) $profesorId) {
+            return false;
+        }
+
+        Auditoria::registrar('seguridad.acceso_denegado', "Intento de acceder a la asistencia de una sesión de un curso ajeno (#{$sesion->id})", [
+            'nivel' => 'aviso',
+            'metadatos' => ['sesion_id' => $sesion->id, 'curso_id' => $sesion->curso_id],
+        ]);
+
+        return true;
     }
 }

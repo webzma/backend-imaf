@@ -23,7 +23,7 @@ class UserNombreTest extends TestCase
 
     public function test_crear_con_campos_individuales_compone_name(): void
     {
-        $user = User::create([
+        $user = User::query()->create([
             'primer_nombre' => 'Juan',
             'segundo_nombre' => 'Pablo',
             'primer_apellido' => 'Pérez',
@@ -39,7 +39,7 @@ class UserNombreTest extends TestCase
 
     public function test_crear_solo_con_name_reparte_las_cuatro_columnas(): void
     {
-        $user = User::create([
+        $user = User::query()->create([
             'name' => 'Juan Pérez',
             'email' => 'juan@example.com',
             'password' => 'password123',
@@ -57,7 +57,7 @@ class UserNombreTest extends TestCase
 
     public function test_actualizar_campos_de_nombre_resincroniza_name(): void
     {
-        $user = User::create([
+        $user = User::query()->create([
             'primer_nombre' => 'Juan',
             'primer_apellido' => 'Pérez',
             'email' => 'juan@example.com',

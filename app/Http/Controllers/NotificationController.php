@@ -6,11 +6,16 @@ use App\Http\Resources\DatabaseNotificationResource;
 use App\Models\User;
 use App\Notifications\GenericNotification;
 use App\Services\Auditoria;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class NotificationController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * @phpstan-return AnonymousResourceCollection
+     */
+    public function index(Request $request): AnonymousResourceCollection
     {
         $notifications = $request->user()
             ->notifications()
@@ -20,14 +25,20 @@ class NotificationController extends Controller
         return DatabaseNotificationResource::collection($notifications);
     }
 
-    public function unreadCount(Request $request)
+    /**
+     * @phpstan-return JsonResponse
+     */
+    public function unreadCount(Request $request): JsonResponse
     {
         return response()->json([
             'unread_count' => $request->user()->unreadNotifications()->count(),
         ]);
     }
 
-    public function markAsRead(Request $request, string $id)
+    /**
+     * @phpstan-return JsonResponse
+     */
+    public function markAsRead(Request $request, string $id): JsonResponse
     {
         $request->user()
             ->notifications()
@@ -38,7 +49,10 @@ class NotificationController extends Controller
         return response()->json(['message' => 'Notificación marcada como leída.']);
     }
 
-    public function markAllAsRead(Request $request)
+    /**
+     * @phpstan-return JsonResponse
+     */
+    public function markAllAsRead(Request $request): JsonResponse
     {
         $request->user()
             ->unreadNotifications()
@@ -47,7 +61,10 @@ class NotificationController extends Controller
         return response()->json(['message' => 'Todas las notificaciones marcadas como leídas.']);
     }
 
-    public function send(Request $request)
+    /**
+     * @phpstan-return JsonResponse
+     */
+    public function send(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'user_id' => 'required|email|exists:users,email',
@@ -56,7 +73,8 @@ class NotificationController extends Controller
             'url' => 'nullable|string',
         ]);
 
-        $user = User::where('email', $validated['user_id'])->firstOrFail();
+        /** @var User $user */
+        $user = User::query()->where('email', $validated['user_id'])->firstOrFail();
 
         $user->notify(new GenericNotification(
             $validated['titulo'],

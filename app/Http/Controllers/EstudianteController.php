@@ -11,12 +11,16 @@ use App\Models\User;
 use App\Notifications\SolicitudCursoProcesada;
 use App\Services\Auditoria;
 use App\Services\CedulaEstudiante;
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Cloudinary\Cloudinary as CloudinaryClient;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class EstudianteController extends Controller
 {
@@ -28,9 +32,10 @@ class EstudianteController extends Controller
         'estado' => 'estado',
     ];
 
-    public function index(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function index(Request $request): JsonResponse
     {
-        $query = Estudiante::with('user', 'curso');
+        $query = Estudiante::query()->with('user', 'curso');
 
         $this->acotarAlProfesor($query, $request->user());
 
@@ -66,7 +71,7 @@ class EstudianteController extends Controller
         }
 
         if ($request->filled('estado_pago')) {
-            $query->conEstadoPago($request->estado_pago);
+            $this->filtrarPorEstadoPago($query, $request->estado_pago);
         }
 
         $this->aplicarOrden($query, $request, self::ORDEN_ESTUDIANTES, 'nombre');
@@ -90,8 +95,10 @@ class EstudianteController extends Controller
      * Las tarjetas de resumen contaban sobre los 10 registros cargados, así
      * que con 300 estudiantes decían "10". Respeta los mismos filtros que
      * `index` para que el resumen describa lo que se está viendo.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function resumen(Request $request)
+    public function resumen(Request $request): JsonResponse
     {
         $query = Estudiante::query();
         $this->acotarAlProfesor($query, $request->user());
@@ -108,7 +115,8 @@ class EstudianteController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function store(Request $request): JsonResponse
     {
         $request->validate(
             [
@@ -169,8 +177,9 @@ class EstudianteController extends Controller
             array_merge($this->mensajesTipoDato(), $this->mensajesFotoCedula()),
         );
 
+        /** @var Estudiante $estudiante */
         $estudiante = DB::transaction(function () use ($request) {
-            $user = User::create([
+            $user = User::query()->create([
                 'primer_nombre' => $request->primer_nombre,
                 'segundo_nombre' => $request->segundo_nombre,
                 'primer_apellido' => $request->primer_apellido,
@@ -180,7 +189,8 @@ class EstudianteController extends Controller
                 'role' => 'estudiante',
             ]);
 
-            $estudiante = Estudiante::create([
+            /** @var Estudiante $estudiante */
+            $estudiante = Estudiante::query()->create([
                 'user_id' => $user->id,
                 'nombre' => $user->name,
                 'nacionalidad' => $request->nacionalidad,
@@ -200,7 +210,7 @@ class EstudianteController extends Controller
 
             $estudiante->update([
                 'foto_cedula' => CedulaEstudiante::subir(
-                    $request->file('foto_cedula'),
+                    $this->archivoRequerido($request, 'foto_cedula'),
                     $estudiante->id,
                 ),
             ]);
@@ -220,8 +230,10 @@ class EstudianteController extends Controller
      * `update` exige el registro completo (municipio y dirección incluidos),
      * así que no servía para tocar solo el estado: graduar a una promoción
      * obligaba a abrir y reenviar quince formularios enteros.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function estadoMasivo(Request $request)
+    public function estadoMasivo(Request $request): JsonResponse
     {
         $datos = $request->validate([
             'ids' => 'required|array|min:1|max:200',
@@ -229,7 +241,7 @@ class EstudianteController extends Controller
             'estado' => 'required|in:activo,inactivo,graduado',
         ]);
 
-        $actualizados = Estudiante::whereIn('id', $datos['ids'])
+        $actualizados = Estudiante::query()->whereIn('id', $datos['ids'])
             ->update(['estado' => $datos['estado']]);
 
         // Actualización masiva: no dispara eventos de modelo, así que se
@@ -241,9 +253,11 @@ class EstudianteController extends Controller
         return response()->json(['actualizados' => $actualizados]);
     }
 
-    public function showMe()
+    /** @phpstan-return JsonResponse */
+    public function showMe(): JsonResponse
     {
-        $estudiante = Estudiante::with('user', 'curso.instructor.user')
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->with('user', 'curso.instructor.user')
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
@@ -258,10 +272,13 @@ class EstudianteController extends Controller
     /**
      * Detalle del curso actual o, con `?curso_id=`, de cualquier curso en el
      * que el estudiante esté o haya estado inscrito.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function miCurso(Request $request)
+    public function miCurso(Request $request): JsonResponse
     {
-        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
 
         $actual = $estudiante->cursoActual();
 
@@ -353,10 +370,13 @@ class EstudianteController extends Controller
     /**
      * Todos los cursos del estudiante (actual y anteriores) y las solicitudes
      * de inscripción que siguen esperando la revisión del pago.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function misCursos()
+    public function misCursos(): JsonResponse
     {
-        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
         $actualId = $estudiante->cursoActual()?->id;
 
         $cursos = $estudiante->cursos()
@@ -378,8 +398,8 @@ class EstudianteController extends Controller
                 'es_actual' => (int) $curso->id === (int) $actualId,
             ]);
 
-        $pendientes = Pago::with('inscripcion', 'curso:cursos.id,cursos.codigo,cursos.nombre')
-            ->deUsuario($estudiante->user_id)
+        $pendientes = Pago::query()->with('inscripcion', 'curso:cursos.id,cursos.codigo,cursos.nombre')
+            ->whereHas('inscripcion.estudiante', fn (Builder $e) => $e->where('user_id', $estudiante->user_id))
             ->where('estado', 'pendiente')
             ->whereHas('inscripcion', fn (Builder $i) => $i->whereNotIn('curso_id', $cursos->pluck('id')))
             ->latest()
@@ -398,9 +418,11 @@ class EstudianteController extends Controller
         ]);
     }
 
-    public function updateMe(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function updateMe(Request $request): JsonResponse
     {
-        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
         $id = $estudiante->id;
 
         $data = $request->validate(
@@ -427,17 +449,19 @@ class EstudianteController extends Controller
         );
     }
 
-    public function uploadFotoMe(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function uploadFotoMe(Request $request): JsonResponse
     {
         $request->validate([
             'foto' => 'required|image|mimes:jpeg,jpg,png,webp|max:2048',
         ]);
 
-        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
 
         try {
-            $upload = Cloudinary::uploadApi()->upload(
-                $request->file('foto')->getRealPath(),
+            $upload = app(CloudinaryClient::class)->uploadApi()->upload(
+                $this->archivoRequerido($request, 'foto')->getRealPath(),
                 [
                     'folder' => 'imaf/perfiles',
                     'public_id' => 'estudiante_'.$estudiante->id,
@@ -452,7 +476,7 @@ class EstudianteController extends Controller
                 ],
             );
         } catch (\Throwable $e) {
-            \Log::error(
+            Log::error(
                 'Error subiendo foto de estudiante: '.$e->getMessage(),
             );
 
@@ -474,19 +498,22 @@ class EstudianteController extends Controller
 
     /**
      * El estudiante reemplaza la imagen de su cédula desde su perfil.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function uploadCedulaMe(Request $request)
+    public function uploadCedulaMe(Request $request): JsonResponse
     {
         $request->validate(
             ['foto_cedula' => 'required|'.self::REGLAS_FOTO_CEDULA],
             $this->mensajesFotoCedula(),
         );
 
-        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
 
         $estudiante->update([
             'foto_cedula' => CedulaEstudiante::subir(
-                $request->file('foto_cedula'),
+                $this->archivoRequerido($request, 'foto_cedula'),
                 $estudiante->id,
             ),
         ]);
@@ -497,12 +524,14 @@ class EstudianteController extends Controller
         );
     }
 
-    public function show(Request $request, string $id)
+    /** @phpstan-return JsonResponse */
+    public function show(Request $request, string $id): JsonResponse
     {
-        $query = Estudiante::with('user', 'curso', 'cursos.instructor.user');
+        $query = Estudiante::query()->with('user', 'curso', 'cursos.instructor.user');
 
         $this->acotarAlProfesor($query, $request->user());
 
+        /** @var Estudiante $estudiante */
         $estudiante = $query->findOrFail($id);
 
         if ($request->user()?->isAdmin()) {
@@ -513,6 +542,38 @@ class EstudianteController extends Controller
     }
 
     /**
+     * @phpstan-param Builder<Estudiante> $query
+     * @phpstan-param string $estado
+     *
+     * @phpstan-return void
+     */
+    private function filtrarPorEstadoPago(Builder $query, string $estado): void
+    {
+        $query->whereRaw(
+            "COALESCE((
+                SELECT i.estado_pago FROM inscripciones i
+                WHERE i.estudiante_id = estudiantes.id AND i.deleted_at IS NULL
+                ORDER BY i.es_actual DESC, i.updated_at DESC, i.id DESC
+                LIMIT 1
+            ), 'pendiente') = ?",
+            [$estado],
+        );
+    }
+
+    private function archivoRequerido(Request $request, string $campo): UploadedFile
+    {
+        $archivo = $request->file($campo);
+
+        if (! $archivo instanceof UploadedFile) {
+            throw ValidationException::withMessages([
+                $campo => ['El archivo es obligatorio.'],
+            ]);
+        }
+
+        return $archivo;
+    }
+
+    /**
      * Restringe una consulta de estudiantes a los inscritos en cursos que dicta
      * el usuario, cuando ese usuario es profesor.
      *
@@ -520,6 +581,11 @@ class EstudianteController extends Controller
      * por admin y profesor. Sin este filtro un instructor podría leer la cédula,
      * la dirección y el teléfono de toda la base, no solo de sus alumnos. El
      * admin conserva la vista completa.
+     *
+     * @phpstan-param Builder<Estudiante> $query
+     * @phpstan-param User|null $usuario
+     *
+     * @phpstan-return void
      */
     private function acotarAlProfesor(Builder $query, ?User $usuario): void
     {
@@ -535,9 +601,11 @@ class EstudianteController extends Controller
         );
     }
 
-    public function update(Request $request, string $id)
+    /** @phpstan-return JsonResponse */
+    public function update(Request $request, string $id): JsonResponse
     {
-        $estudiante = Estudiante::findOrFail($id);
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->findOrFail($id);
 
         $data = $request->validate(
             [
@@ -604,7 +672,7 @@ class EstudianteController extends Controller
 
         if ($request->hasFile('foto_cedula')) {
             $data['foto_cedula'] = CedulaEstudiante::subir(
-                $request->file('foto_cedula'),
+                $this->archivoRequerido($request, 'foto_cedula'),
                 $estudiante->id,
             );
         } else {
@@ -653,9 +721,10 @@ class EstudianteController extends Controller
         );
     }
 
-    public function destroy(string $id)
+    /** @phpstan-return JsonResponse */
+    public function destroy(string $id): JsonResponse
     {
-        Estudiante::findOrFail($id)->delete();
+        Estudiante::query()->findOrFail($id)->delete();
 
         return response()->json([
             'message' => 'Estudiante eliminado correctamente.',
@@ -664,10 +733,13 @@ class EstudianteController extends Controller
 
     /**
      * Admin: aprueba o rechaza el pago (acceso al curso).
+     *
+     * @phpstan-return JsonResponse
      */
-    public function updateEstadoPago(Request $request, string $id)
+    public function updateEstadoPago(Request $request, string $id): JsonResponse
     {
-        $estudiante = Estudiante::with('user', 'curso')->findOrFail($id);
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->with('user', 'curso')->findOrFail($id);
 
         $data = $request->validate([
             'estado_pago' => 'required|in:pendiente,aprobado,rechazado',
@@ -707,10 +779,13 @@ class EstudianteController extends Controller
 
     /**
      * Profesor: aprueba o rechaza la finalización del curso (certificado).
+     *
+     * @phpstan-return JsonResponse
      */
-    public function updateAprobacionCurso(Request $request, string $id)
+    public function updateAprobacionCurso(Request $request, string $id): JsonResponse
     {
-        $estudiante = Estudiante::with('user')->findOrFail($id);
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->with('user')->findOrFail($id);
 
         // Sin `curso_id` se asume el curso actual del estudiante.
         $cursoId = $request->filled('curso_id')
@@ -743,11 +818,11 @@ class EstudianteController extends Controller
 
         // Solo se puede aprobar si asistió a todas las sesiones realizadas del curso
         if ($data['estado_aprobacion_curso'] === 'aprobado') {
-            $sesionesRealizadas = Sesion::where('curso_id', $curso->id)
+            $sesionesRealizadas = Sesion::query()->where('curso_id', $curso->id)
                 ->where('estado', 'realizada')
                 ->pluck('id');
 
-            $presentes = Asistencia::where('estudiante_id', $estudiante->id)
+            $presentes = Asistencia::query()->where('estudiante_id', $estudiante->id)
                 ->whereIn('sesion_id', $sesionesRealizadas)
                 ->where('presente', true)
                 ->count();
@@ -782,7 +857,7 @@ class EstudianteController extends Controller
             ]);
         }
 
-        Inscripcion::where('estudiante_id', $estudiante->id)
+        Inscripcion::query()->where('estudiante_id', $estudiante->id)
             ->where('curso_id', $curso->id)
             ->update(['estado_aprobacion_curso' => $nuevoEstado]);
 

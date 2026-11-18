@@ -3,16 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\DatoBancario;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DatoBancarioController extends Controller
 {
     /**
      * Admin: listar todos los datos bancarios.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function index()
+    public function index(): JsonResponse
     {
-        $datos = DatoBancario::all();
+        $datos = DatoBancario::query()->get();
 
         return response()->json($datos);
     }
@@ -20,8 +23,10 @@ class DatoBancarioController extends Controller
     /**
      * Admin: guardar (crear o actualizar) datos bancarios por tipo.
      * Se envía un array con los datos y el tipo (pago_movil o transferencia).
+     *
+     * @phpstan-return JsonResponse
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $tipo = $request->tipo;
 
@@ -48,12 +53,12 @@ class DatoBancarioController extends Controller
             ], 422);
         }
 
-        $dato = DatoBancario::where('tipo', $tipo)->first();
+        $dato = DatoBancario::query()->where('tipo', $tipo)->first();
 
         if ($dato) {
             $dato->update($validated);
         } else {
-            $dato = DatoBancario::create($validated);
+            $dato = DatoBancario::query()->create($validated);
         }
 
         return response()->json($dato);
@@ -61,8 +66,10 @@ class DatoBancarioController extends Controller
 
     /**
      * Pública: obtener datos bancarios por tipo (para que el estudiante los consuma).
+     *
+     * @phpstan-return JsonResponse
      */
-    public function show(string $tipo)
+    public function show(string $tipo): JsonResponse
     {
         if (! in_array($tipo, ['pago_movil', 'transferencia'])) {
             return response()->json([
@@ -70,7 +77,7 @@ class DatoBancarioController extends Controller
             ], 422);
         }
 
-        $dato = DatoBancario::where('tipo', $tipo)->first();
+        $dato = DatoBancario::query()->where('tipo', $tipo)->first();
 
         if (! $dato) {
             return response()->json(null, 200);
@@ -81,10 +88,12 @@ class DatoBancarioController extends Controller
 
     /**
      * Pública: obtener todos los datos bancarios (para que el estudiante los consuma).
+     *
+     * @phpstan-return JsonResponse
      */
-    public function all()
+    public function all(): JsonResponse
     {
-        $datos = DatoBancario::all();
+        $datos = DatoBancario::query()->get();
 
         return response()->json($datos);
     }

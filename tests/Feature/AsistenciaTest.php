@@ -19,7 +19,7 @@ class AsistenciaTest extends TestCase
     {
         $curso = Curso::factory()->create();
 
-        return Sesion::create([
+        return Sesion::query()->create([
             'curso_id' => $curso->id,
             'titulo' => 'Sesión de prueba',
             'fecha' => '2026-07-10',
@@ -46,7 +46,7 @@ class AsistenciaTest extends TestCase
     {
         $profesor = Profesor::factory()->create();
         $curso = Curso::factory()->create(['profesor_id' => $profesor->id]);
-        $sesion = Sesion::create([
+        $sesion = Sesion::query()->create([
             'curso_id' => $curso->id,
             'titulo' => 'Sesión del profe',
             'fecha' => '2026-07-11',

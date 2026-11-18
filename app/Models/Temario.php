@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Temario extends Model
 {
@@ -15,12 +17,14 @@ class Temario extends Model
 
     protected $fillable = ['curso_id', 'titulo', 'descripcion', 'orden'];
 
-    public function curso()
+    /** @phpstan-return BelongsTo<Curso, Temario> */
+    public function curso(): BelongsTo
     {
         return $this->belongsTo(Curso::class);
     }
 
-    public function sesiones()
+    /** @phpstan-return HasMany<Sesion, Temario> */
+    public function sesiones(): HasMany
     {
         return $this->hasMany(Sesion::class);
     }

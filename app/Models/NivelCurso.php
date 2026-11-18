@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class NivelCurso extends Model
 {
@@ -19,7 +20,8 @@ class NivelCurso extends Model
         'nombre',
     ];
 
-    public function cursos()
+    /** @phpstan-return HasMany<Curso, NivelCurso> */
+    public function cursos(): HasMany
     {
         return $this->hasMany(Curso::class, 'nivel_curso_id');
     }

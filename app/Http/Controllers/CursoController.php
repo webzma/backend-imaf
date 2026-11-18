@@ -12,6 +12,9 @@ use App\Rules\DiaHabil;
 use App\Services\Auditoria;
 use App\Services\CursoEstadoService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -27,11 +30,12 @@ class CursoController extends Controller
         'estado' => 'estado',
     ];
 
-    public function index(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function index(Request $request): JsonResponse
     {
         CursoEstadoService::sincronizarConCache();
 
-        $query = Curso::with('instructor.user', 'nivelCurso', 'estudiantes.user');
+        $query = Curso::query()->with('instructor.user', 'nivelCurso', 'estudiantes.user');
 
         $this->acotarAlProfesor($query, $request->user());
 
@@ -60,35 +64,41 @@ class CursoController extends Controller
         return response()->json($query->paginate($this->registrosPorPagina($request)));
     }
 
-    /** Totales sobre la tabla completa, para las tarjetas de resumen. */
-    public function resumen()
+    /**
+     * Totales sobre la tabla completa, para las tarjetas de resumen.
+     *
+     * @phpstan-return JsonResponse
+     */
+    public function resumen(): JsonResponse
     {
         return response()->json([
-            'total' => Curso::count(),
-            'activos' => Curso::where('estado', 'activo')->count(),
-            'inactivos' => Curso::where('estado', 'inactivo')->count(),
-            'estudiantes' => Estudiante::has('cursos')->count(),
-            'con_estudiantes' => Curso::has('estudiantes')->count(),
+            'total' => Curso::query()->count(),
+            'activos' => Curso::query()->where('estado', 'activo')->count(),
+            'inactivos' => Curso::query()->where('estado', 'inactivo')->count(),
+            'estudiantes' => Estudiante::query()->has('cursos')->count(),
+            'con_estudiantes' => Curso::query()->has('estudiantes')->count(),
         ]);
     }
 
-    public function indexActivos(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function indexActivos(Request $request): JsonResponse
     {
         CursoEstadoService::sincronizarConCache();
 
         return response()->json(
-            Curso::with('instructor.user', 'nivelCurso')
+            Curso::query()->with('instructor.user', 'nivelCurso')
                 ->where('estado', 'activo')
                 ->latest('id')
                 ->paginate($this->registrosPorPagina($request, self::MAX_PER_PAGE_CATALOGO))
         );
     }
 
-    public function misCursos(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function misCursos(Request $request): JsonResponse
     {
-        $profesor = Profesor::where('user_id', $request->user()->id)->firstOrFail();
+        $profesor = Profesor::query()->where('user_id', $request->user()->id)->firstOrFail();
 
-        $cursos = Curso::where('profesor_id', $profesor->id)
+        $cursos = Curso::query()->where('profesor_id', $profesor->id)
             ->latest('id')
             ->paginate($this->registrosPorPagina($request, self::MAX_PER_PAGE_CATALOGO));
 
@@ -101,7 +111,8 @@ class CursoController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
             'profesor_id' => ['required', Rule::exists('profesores', 'id')],
@@ -118,10 +129,11 @@ class CursoController extends Controller
             'estado' => 'in:activo,inactivo',
         ]);
 
-        $curso = Curso::create($data);
+        /** @var Curso $curso */
+        $curso = Curso::query()->create($data);
 
         // Notificar al profesor asignado
-        $profesor = Profesor::with('user')->find($curso->profesor_id);
+        $profesor = Profesor::query()->with('user')->find($curso->profesor_id);
         if ($profesor && $profesor->user) {
             $profesor->user->notify(new GenericNotification(
                 'Asignación de Curso',
@@ -133,9 +145,11 @@ class CursoController extends Controller
         return response()->json($curso->load('instructor', 'nivelCurso'), 201);
     }
 
-    public function show(Request $request, string $id)
+    /** @phpstan-return JsonResponse */
+    public function show(Request $request, string $id): JsonResponse
     {
-        $curso = Curso::with('instructor.user', 'nivelCurso', 'temario', 'sesiones')->findOrFail($id);
+        /** @var Curso $curso */
+        $curso = Curso::query()->with('instructor.user', 'nivelCurso', 'temario', 'sesiones')->findOrFail($id);
 
         $usuario = $request->user();
         $esProfesor = $usuario?->isProfesor() ?? false;
@@ -155,12 +169,12 @@ class CursoController extends Controller
         // quien no ha pagado, está inactivo o fue archivado. El estudiante
         // (catálogo) solo ve su propia inscripción con el pago aprobado.
         $estudiantes = $interno
-            ? $curso->matriculas()->withTrashed()->with('user')->get()
+            ? $this->matriculas($curso)->with('user')->get()
             : $curso->estudiantes()->with('user')->whereKey($estudiante->id)->get();
 
         // Los campos del estudiante describen su curso actual; en la lista
         // de este curso deben verse los de este curso.
-        $estudiantes->each(fn ($e) => $e->forceFill([
+        $estudiantes->each(fn (Estudiante $e) => $e->forceFill([
             'estado_pago' => $e->pivot->estado_pago,
             'estado_aprobacion_curso' => $e->pivot->estado_aprobacion_curso,
             'fecha_inscripcion' => $e->pivot->fecha_inscripcion ?? $e->fecha_inscripcion,
@@ -176,15 +190,19 @@ class CursoController extends Controller
      * aprobado y el curso pasa a ser el actual). También sirve para dar por
      * pagada una inscripción pendiente o rechazada.
      */
-    public function inscribirEstudiante(Request $request, string $id)
+    /** @phpstan-return JsonResponse */
+    public function inscribirEstudiante(Request $request, string $id): JsonResponse
     {
         $data = $request->validate([
             'estudiante_id' => 'required|integer|exists:estudiantes,id',
         ]);
 
-        return DB::transaction(function () use ($id, $data) {
-            $curso = Curso::lockForUpdate()->findOrFail($id);
-            $estudiante = Estudiante::findOrFail($data['estudiante_id']);
+        /** @var JsonResponse $respuesta */
+        $respuesta = DB::transaction(function () use ($id, $data) {
+            /** @var Curso $curso */
+            $curso = Curso::query()->lockForUpdate()->findOrFail($id);
+            /** @var Estudiante $estudiante */
+            $estudiante = Estudiante::query()->findOrFail($data['estudiante_id']);
 
             $yaInscrito = $curso->estudiantes()->whereKey($estudiante->id)->exists();
             if (! $yaInscrito && $curso->estudiantes()->count() >= $curso->limite_cupo) {
@@ -202,16 +220,21 @@ class CursoController extends Controller
 
             return response()->json($this->estudianteEnCurso($curso, $estudiante->id), 201);
         });
+
+        return $respuesta;
     }
 
     /**
      * Admin: quita al estudiante del curso. Si era su
      * curso actual, vuelve al último curso pagado que le quede.
      */
-    public function quitarEstudiante(string $id, string $estudianteId)
+    /** @phpstan-return JsonResponse */
+    public function quitarEstudiante(string $id, string $estudianteId): JsonResponse
     {
-        $curso = Curso::findOrFail($id);
-        $estudiante = Estudiante::withTrashed()->findOrFail($estudianteId);
+        /** @var Curso $curso */
+        $curso = Curso::query()->findOrFail($id);
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->withoutGlobalScope(SoftDeletingScope::class)->findOrFail($estudianteId);
 
         $estudiante->quitarDeCurso($curso->id);
 
@@ -224,6 +247,12 @@ class CursoController extends Controller
         return response()->json(['message' => 'Estudiante quitado del curso.']);
     }
 
+    /**
+     * @phpstan-param Builder<Curso> $query
+     * @phpstan-param User|null $usuario
+     *
+     * @phpstan-return void
+     */
     private function acotarAlProfesor(Builder $query, ?User $usuario): void
     {
         if (! $usuario || ! $usuario->isProfesor()) {
@@ -233,10 +262,27 @@ class CursoController extends Controller
         $query->where('profesor_id', $usuario->profesor?->id ?? -1);
     }
 
-    /** Un estudiante tal como aparece en el listado interno del curso. */
+    /** @phpstan-return BelongsToMany<Estudiante, Curso> */
+    private function matriculas(Curso $curso): BelongsToMany
+    {
+        $relacion = $curso->matriculas();
+
+        /** @var Builder $query */
+        $query = $relacion;
+        $query->withoutGlobalScope(SoftDeletingScope::class);
+
+        return $relacion;
+    }
+
+    /**
+     * Un estudiante tal como aparece en el listado interno del curso.
+     *
+     * @phpstan-return Estudiante
+     */
     private function estudianteEnCurso(Curso $curso, int $estudianteId): Estudiante
     {
-        $e = $curso->matriculas()->withTrashed()->with('user')->whereKey($estudianteId)->firstOrFail();
+        /** @var Estudiante $e */
+        $e = $this->matriculas($curso)->with('user')->whereKey($estudianteId)->firstOrFail();
 
         return $e->forceFill([
             'estado_pago' => $e->pivot->estado_pago,
@@ -245,9 +291,11 @@ class CursoController extends Controller
         ]);
     }
 
-    public function update(Request $request, string $id)
+    /** @phpstan-return JsonResponse */
+    public function update(Request $request, string $id): JsonResponse
     {
-        $curso = Curso::findOrFail($id);
+        /** @var Curso $curso */
+        $curso = Curso::query()->findOrFail($id);
 
         $data = $request->validate([
             'profesor_id' => ['sometimes', Rule::exists('profesores', 'id')],
@@ -278,7 +326,7 @@ class CursoController extends Controller
 
         // Notificar al profesor si el estado del curso cambió
         if (isset($data['estado']) && $data['estado'] !== $oldEstado) {
-            $profesor = Profesor::with('user')->find($curso->profesor_id);
+            $profesor = Profesor::query()->with('user')->find($curso->profesor_id);
             if ($profesor && $profesor->user) {
                 $estadoTexto = $data['estado'] === 'activo' ? 'activado' : 'inactivado';
                 $profesor->user->notify(new GenericNotification(
@@ -291,7 +339,7 @@ class CursoController extends Controller
 
         // Si se cambió el profesor, notificar al nuevo profesor
         if (isset($data['profesor_id']) && (int) $data['profesor_id'] !== (int) $oldProfesorId) {
-            $profesor = Profesor::with('user')->find($data['profesor_id']);
+            $profesor = Profesor::query()->with('user')->find($data['profesor_id']);
             if ($profesor && $profesor->user) {
                 $profesor->user->notify(new GenericNotification(
                     'Asignación de Curso',
@@ -304,9 +352,10 @@ class CursoController extends Controller
         return response()->json($curso->load('instructor', 'nivelCurso'));
     }
 
-    public function destroy(string $id)
+    /** @phpstan-return JsonResponse */
+    public function destroy(string $id): JsonResponse
     {
-        Curso::findOrFail($id)->delete();
+        Curso::query()->findOrFail($id)->delete();
 
         return response()->json(['message' => 'Curso eliminado correctamente.']);
     }

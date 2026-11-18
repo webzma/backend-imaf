@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Profesor extends Model
@@ -41,32 +43,38 @@ class Profesor extends Model
         ];
     }
 
-    public function user()
+    /** @phpstan-return BelongsTo<User, Profesor> */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function tipoContrato()
+    /** @phpstan-return BelongsTo<TipoContrato, Profesor> */
+    public function tipoContrato(): BelongsTo
     {
         return $this->belongsTo(TipoContrato::class, 'tipo_contrato_id');
     }
 
-    public function especialidad()
+    /** @phpstan-return BelongsTo<Especialidad, Profesor> */
+    public function especialidad(): BelongsTo
     {
         return $this->belongsTo(Especialidad::class, 'especialidad_id');
     }
 
-    public function departamento()
+    /** @phpstan-return BelongsTo<Departamento, Profesor> */
+    public function departamento(): BelongsTo
     {
         return $this->belongsTo(Departamento::class, 'departamento_id');
     }
 
-    public function titulo()
+    /** @phpstan-return BelongsTo<Titulo, Profesor> */
+    public function titulo(): BelongsTo
     {
         return $this->belongsTo(Titulo::class, 'titulo_id');
     }
 
-    public function cursos()
+    /** @phpstan-return HasMany<Curso, Profesor> */
+    public function cursos(): HasMany
     {
         return $this->hasMany(Curso::class, 'profesor_id');
     }

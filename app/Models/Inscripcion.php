@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /** Un curso que un estudiante cursó o cursa. */
@@ -44,17 +46,20 @@ class Inscripcion extends Model
         return ($estudiante ?? 'Estudiante #'.$this->estudiante_id).' → '.($curso ?? 'curso #'.$this->curso_id);
     }
 
-    public function estudiante()
+    /** @phpstan-return BelongsTo<Estudiante, Inscripcion> */
+    public function estudiante(): BelongsTo
     {
         return $this->belongsTo(Estudiante::class);
     }
 
-    public function curso()
+    /** @phpstan-return BelongsTo<Curso, Inscripcion> */
+    public function curso(): BelongsTo
     {
         return $this->belongsTo(Curso::class);
     }
 
-    public function pagos()
+    /** @phpstan-return HasMany<Pago, Inscripcion> */
+    public function pagos(): HasMany
     {
         return $this->hasMany(Pago::class);
     }

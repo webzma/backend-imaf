@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TipoContrato extends Model
 {
@@ -19,7 +20,8 @@ class TipoContrato extends Model
         'nombre',
     ];
 
-    public function profesores()
+    /** @phpstan-return HasMany<Profesor, TipoContrato> */
+    public function profesores(): HasMany
     {
         return $this->hasMany(Profesor::class, 'tipo_contrato_id');
     }

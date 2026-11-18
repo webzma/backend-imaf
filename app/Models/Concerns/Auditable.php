@@ -3,6 +3,7 @@
 namespace App\Models\Concerns;
 
 use App\Services\Auditoria;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 /**
@@ -16,18 +17,50 @@ use Illuminate\Support\Str;
  *
  * Las actualizaciones masivas (`Modelo::where(...)->update()`) no disparan
  * eventos de Eloquent: quien las haga debe registrar un evento propio.
+ *
+ * @phpstan-require-extends Model
+ *
+ * @psalm-require-extends Model
+ *
+ * @mixin Model
  */
 trait Auditable
 {
+    /**
+     * @param  string  $event
+     * @param  callable  $callback
+     * @return void
+     */
+    abstract protected static function registerModelEvent($event, $callback);
+
+    /**
+     * @param  string  $key
+     * @return mixed
+     */
+    abstract public function getAttribute($key);
+
+    /** @return int|string|null */
+    abstract public function getKey();
+
+    /** @return array<string, mixed> */
+    abstract public function getChanges();
+
+    /**
+     * @param  string|null  $key
+     * @param  mixed  $default
+     * @return mixed
+     */
+    abstract public function getRawOriginal($key = null, $default = null);
+
     public static function bootAuditable(): void
     {
-        static::created(function ($modelo) {
+        static::registerModelEvent('created', function ($modelo) {
             $modelo->registrarAuditoria('creado', 'Alta de', [
                 'despues' => $modelo->valoresAuditables($modelo->getAttributes()),
             ]);
         });
 
-        static::updated(function ($modelo) {
+        static::registerModelEvent('updated', function ($modelo) {
             $cambios = $modelo->cambiosAuditables();
             if ($cambios === null) {
                 return;
@@ -35,7 +68,7 @@ trait Auditable
             $modelo->registrarAuditoria('actualizado', 'Modificación de', $cambios);
         });
 
-        static::deleted(function ($modelo) {
+        static::registerModelEvent('deleted', function ($modelo) {
             $definitivo = ! method_exists($modelo, 'isForceDeleting') || $modelo->isForceDeleting();
             $modelo->registrarAuditoria(
                 $definitivo ? 'eliminado' : 'archivado',
@@ -46,7 +79,7 @@ trait Auditable
         });
 
         if (method_exists(static::class, 'restored')) {
-            static::restored(function ($modelo) {
+            static::registerModelEvent('restored', function ($modelo) {
                 $modelo->registrarAuditoria('restaurado', 'Restauración de', null);
             });
         }
@@ -72,6 +105,12 @@ trait Auditable
         return null;
     }
 
+    /**
+     * @phpstan-param array{antes: array<string, mixed>, despues: array<string, mixed>}|null $cambios
+     * @phpstan-param 'info'|'aviso'|'critico' $nivel
+     *
+     * @phpstan-return void
+     */
     protected function registrarAuditoria(string $accion, string $verbo, ?array $cambios, string $nivel = 'info'): void
     {
         $entidad = $this->auditEntidad();
@@ -97,7 +136,7 @@ trait Auditable
         );
     }
 
-    /** @return array{antes: array, despues: array}|null */
+    /** @return array{antes: array<string, mixed>, despues: array<string, mixed>}|null */
     protected function cambiosAuditables(): ?array
     {
         $ignorados = config('auditoria.campos_ignorados', []);
@@ -116,7 +155,13 @@ trait Auditable
         return ['antes' => $antes, 'despues' => $nuevos];
     }
 
-    /** Quita los campos excluidos del modelo; los sensibles los oculta el servicio. */
+    /**
+     * Quita los campos excluidos del modelo; los sensibles los oculta el servicio.
+     *
+     * @phpstan-param array<string, mixed> $valores
+     *
+     * @phpstan-return array<string, mixed>
+     */
     protected function valoresAuditables(array $valores): array
     {
         $excluir = property_exists($this, 'auditExcluir') ? $this->auditExcluir : [];

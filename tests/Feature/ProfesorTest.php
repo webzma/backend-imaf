@@ -38,10 +38,10 @@ class ProfesorTest extends TestCase
     public function test_admin_puede_crear_profesor_con_usuario(): void
     {
         $this->actingAsAdmin();
-        $tipo = TipoContrato::create(['nombre' => 'Tiempo completo']);
-        $especialidad = Especialidad::create(['nombre' => 'Matemáticas']);
-        $titulo = Titulo::create(['nombre' => 'Licenciatura']);
-        $departamento = Departamento::create(['nombre' => 'Ciencias Exactas']);
+        $tipo = TipoContrato::query()->create(['nombre' => 'Tiempo completo']);
+        $especialidad = Especialidad::query()->create(['nombre' => 'Matemáticas']);
+        $titulo = Titulo::query()->create(['nombre' => 'Licenciatura']);
+        $departamento = Departamento::query()->create(['nombre' => 'Ciencias Exactas']);
 
         $response = $this->postJson('/api/admin/profesores', [
             'primer_nombre' => 'Carlos',
@@ -82,7 +82,7 @@ class ProfesorTest extends TestCase
 
     public function test_profesor_puede_actualizar_su_propio_perfil(): void
     {
-        $especialidad = Especialidad::create(['nombre' => 'Física']);
+        $especialidad = Especialidad::query()->create(['nombre' => 'Física']);
         $profesor = Profesor::factory()->create();
         Sanctum::actingAs($profesor->user);
 

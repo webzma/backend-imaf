@@ -5,10 +5,19 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
+/**
+ * @property string|null $name
+ * @property string|null $primer_nombre
+ * @property string|null $segundo_nombre
+ * @property string|null $primer_apellido
+ * @property string|null $segundo_apellido
+ * @property string $role
+ */
 class User extends Authenticatable
 {
     use Auditable;
@@ -55,6 +64,11 @@ class User extends Authenticatable
         ];
     }
 
+    protected static function newFactory(): UserFactory
+    {
+        return UserFactory::new();
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
@@ -98,6 +112,8 @@ class User extends Authenticatable
 
     /**
      * Heurística por cantidad de palabras para repartir un nombre completo.
+     *
+     * @return array{0: string|null, 1: string|null, 2: string|null, 3: string|null}
      */
     public static function repartirNombre(?string $nombre): array
     {
@@ -105,7 +121,8 @@ class User extends Authenticatable
             return [null, null, null, null];
         }
 
-        $partes = preg_split('/\s+/u', trim($nombre));
+        $nombre = trim($nombre);
+        $partes = preg_split('/\s+/u', $nombre) ?: [$nombre];
         $total = count($partes);
 
         return match (true) {
@@ -131,12 +148,14 @@ class User extends Authenticatable
         return $this->role === 'estudiante';
     }
 
-    public function estudiante()
+    /** @phpstan-return HasOne<Estudiante, User> */
+    public function estudiante(): HasOne
     {
         return $this->hasOne(Estudiante::class);
     }
 
-    public function profesor()
+    /** @phpstan-return HasOne<Profesor, User> */
+    public function profesor(): HasOne
     {
         return $this->hasOne(Profesor::class);
     }

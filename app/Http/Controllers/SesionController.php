@@ -7,6 +7,7 @@ use App\Models\Profesor;
 use App\Models\Sesion;
 use App\Models\Temario;
 use App\Notifications\GenericNotification;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -16,6 +17,8 @@ class SesionController extends Controller
     /**
      * Lanza un error 422 si el instructor del curso ya tiene otra clase
      * (no cancelada) que se solape en fecha y hora.
+     *
+     * @phpstan-return void
      */
     private function validarConflictoInstructor(
         int|string $cursoId,
@@ -24,12 +27,13 @@ class SesionController extends Controller
         ?string $horaFin,
         ?int $ignorarSesionId = null,
     ): void {
-        $curso = Curso::find($cursoId);
+        /** @var Curso|null $curso */
+        $curso = Curso::query()->find($cursoId);
         if (! $curso || ! $curso->profesor_id) {
             return;
         }
 
-        $candidatas = Sesion::whereDate('fecha', $fecha)
+        $candidatas = Sesion::query()->whereDate('fecha', $fecha)
             ->where('estado', '!=', 'cancelada')
             ->whereHas('curso', fn ($q) => $q->where('profesor_id', $curso->profesor_id))
             ->when($ignorarSesionId, fn ($q) => $q->where('id', '!=', $ignorarSesionId))
@@ -55,6 +59,8 @@ class SesionController extends Controller
     /**
      * Convierte el rango horario a minutos del día. Sin hora de inicio la
      * sesión ocupa todo el día; sin hora de fin se asume una hora de duración.
+     *
+     * @return array<int, int>
      */
     private function rangoEnMinutos(?string $horaInicio, ?string $horaFin): array
     {
@@ -70,9 +76,11 @@ class SesionController extends Controller
         return [$inicio, $fin];
     }
 
-    private function notifyInstructor(string $cursoId, string $accion)
+    /** @phpstan-return void */
+    private function notifyInstructor(string $cursoId, string $accion): void
     {
-        $curso = Curso::with('instructor.user')->find($cursoId);
+        /** @var Curso|null $curso */
+        $curso = Curso::query()->with('instructor.user')->find($cursoId);
         if ($curso && $curso->instructor && $curso->instructor->user) {
             $curso->instructor->user->notify(new GenericNotification(
                 'Horario Actualizado',
@@ -82,18 +90,20 @@ class SesionController extends Controller
         }
     }
 
-    public function index(string $cursoId)
+    /** @phpstan-return JsonResponse */
+    public function index(string $cursoId): JsonResponse
     {
-        Curso::findOrFail($cursoId);
+        Curso::query()->findOrFail($cursoId);
 
         return response()->json(
-            Sesion::where('curso_id', $cursoId)->orderBy('fecha')->orderBy('hora_inicio')->get()
+            Sesion::query()->where('curso_id', $cursoId)->orderBy('fecha')->orderBy('hora_inicio')->get()
         );
     }
 
-    public function horario(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function horario(Request $request): JsonResponse
     {
-        $query = Sesion::with(['curso.instructor.user'])
+        $query = Sesion::query()->with(['curso.instructor.user'])
             ->orderBy('fecha')
             ->orderBy('hora_inicio');
 
@@ -118,11 +128,13 @@ class SesionController extends Controller
         return response()->json($query->get());
     }
 
-    public function horarioProfesor(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function horarioProfesor(Request $request): JsonResponse
     {
-        $profesor = Profesor::where('user_id', Auth::id())->firstOrFail();
+        /** @var Profesor $profesor */
+        $profesor = Profesor::query()->where('user_id', Auth::id())->firstOrFail();
 
-        $query = Sesion::with(['curso.instructor.user'])
+        $query = Sesion::query()->with(['curso.instructor.user'])
             ->whereHas('curso', function ($q) use ($profesor) {
                 $q->where('profesor_id', $profesor->id);
             })
@@ -145,7 +157,8 @@ class SesionController extends Controller
         return response()->json($query->get());
     }
 
-    public function storeGlobal(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function storeGlobal(Request $request): JsonResponse
     {
         $data = $request->validate([
             'curso_id' => 'required|exists:cursos,id',
@@ -169,7 +182,8 @@ class SesionController extends Controller
 
         $data = $this->aplicarTema($data, (int) $data['curso_id']);
 
-        $sesion = Sesion::create($data);
+        /** @var Sesion $sesion */
+        $sesion = Sesion::query()->create($data);
         $sesion->load(['curso.instructor.user']);
 
         $this->notifyInstructor($data['curso_id'], 'agregado');
@@ -177,9 +191,11 @@ class SesionController extends Controller
         return response()->json($sesion, 201);
     }
 
-    public function updateGlobal(Request $request, string $id)
+    /** @phpstan-return JsonResponse */
+    public function updateGlobal(Request $request, string $id): JsonResponse
     {
-        $sesion = Sesion::findOrFail($id);
+        /** @var Sesion $sesion */
+        $sesion = Sesion::query()->findOrFail($id);
 
         $data = $request->validate([
             'curso_id' => 'sometimes|exists:cursos,id',
@@ -213,9 +229,11 @@ class SesionController extends Controller
         return response()->json($sesion);
     }
 
-    public function destroyGlobal(string $id)
+    /** @phpstan-return JsonResponse */
+    public function destroyGlobal(string $id): JsonResponse
     {
-        $sesion = Sesion::findOrFail($id);
+        /** @var Sesion $sesion */
+        $sesion = Sesion::query()->findOrFail($id);
         $cursoId = $sesion->curso_id;
         $sesion->delete();
 
@@ -224,9 +242,10 @@ class SesionController extends Controller
         return response()->json(['message' => 'Sesión eliminada.']);
     }
 
-    public function store(Request $request, string $cursoId)
+    /** @phpstan-return JsonResponse */
+    public function store(Request $request, string $cursoId): JsonResponse
     {
-        Curso::findOrFail($cursoId);
+        Curso::query()->findOrFail($cursoId);
 
         $data = $request->validate([
             'temario_id' => 'nullable|integer|exists:temarios,id',
@@ -249,16 +268,19 @@ class SesionController extends Controller
 
         $data = $this->aplicarTema($data, (int) $cursoId);
 
-        $sesion = Sesion::create(['curso_id' => $cursoId, ...$data]);
+        /** @var Sesion $sesion */
+        $sesion = Sesion::query()->create(['curso_id' => $cursoId, ...$data]);
 
         $this->notifyInstructor($cursoId, 'agregado');
 
         return response()->json($sesion, 201);
     }
 
-    public function update(Request $request, string $cursoId, string $id)
+    /** @phpstan-return JsonResponse */
+    public function update(Request $request, string $cursoId, string $id): JsonResponse
     {
-        $sesion = Sesion::where('curso_id', $cursoId)->findOrFail($id);
+        /** @var Sesion $sesion */
+        $sesion = Sesion::query()->where('curso_id', $cursoId)->findOrFail($id);
 
         $data = $request->validate([
             'temario_id' => 'nullable|integer|exists:temarios,id',
@@ -290,9 +312,11 @@ class SesionController extends Controller
         return response()->json($sesion);
     }
 
-    public function destroy(string $cursoId, string $id)
+    /** @phpstan-return JsonResponse */
+    public function destroy(string $cursoId, string $id): JsonResponse
     {
-        $sesion = Sesion::where('curso_id', $cursoId)->findOrFail($id);
+        /** @var Sesion $sesion */
+        $sesion = Sesion::query()->where('curso_id', $cursoId)->findOrFail($id);
         $sesion->delete();
 
         $this->notifyInstructor($cursoId, 'eliminado');
@@ -331,7 +355,8 @@ class SesionController extends Controller
             return $data;
         }
 
-        $tema = Temario::find($temaId);
+        /** @var Temario|null $tema */
+        $tema = Temario::query()->find($temaId);
 
         if (! $tema || (int) $tema->curso_id !== $cursoId) {
             if (! $temaPedido) {

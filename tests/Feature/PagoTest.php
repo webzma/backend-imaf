@@ -49,7 +49,7 @@ class PagoTest extends TestCase
 
         $response->assertCreated();
         $this->assertDatabaseHas('pagos', [
-            'inscripcion_id' => Inscripcion::where('curso_id', $curso->id)->value('id'),
+            'inscripcion_id' => Inscripcion::query()->where('curso_id', $curso->id)->value('id'),
             'metodo_pago' => 'pago_movil',
             'referencia' => '123456789',
             'estado' => 'pendiente',
@@ -69,7 +69,7 @@ class PagoTest extends TestCase
         ], ['Accept' => 'application/json'])->assertCreated();
 
         $this->assertDatabaseHas('pagos', [
-            'inscripcion_id' => Inscripcion::where('curso_id', $curso->id)->value('id'),
+            'inscripcion_id' => Inscripcion::query()->where('curso_id', $curso->id)->value('id'),
             'metodo_pago' => 'transferencia',
             'estado' => 'pendiente',
         ]);
@@ -85,7 +85,7 @@ class PagoTest extends TestCase
         ])->assertCreated();
 
         $this->assertDatabaseHas('pagos', [
-            'inscripcion_id' => Inscripcion::where('curso_id', $curso->id)->value('id'),
+            'inscripcion_id' => Inscripcion::query()->where('curso_id', $curso->id)->value('id'),
             'metodo_pago' => 'efectivo',
             'referencia' => null,
             'comprobante' => null,

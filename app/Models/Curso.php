@@ -5,6 +5,10 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -57,7 +61,7 @@ class Curso extends Model
         static::creating(function (Curso $curso) {
             do {
                 $codigo = 'CUR-'.strtoupper(Str::random(6));
-            } while (static::where('codigo', $codigo)->exists());
+            } while (static::query()->where('codigo', $codigo)->exists());
 
             $curso->codigo = $codigo;
         });
@@ -91,12 +95,14 @@ class Curso extends Model
         return self::SEDE;
     }
 
-    public function instructor()
+    /** @phpstan-return BelongsTo<Profesor, Curso> */
+    public function instructor(): BelongsTo
     {
         return $this->belongsTo(Profesor::class, 'profesor_id');
     }
 
-    public function nivelCurso()
+    /** @phpstan-return BelongsTo<NivelCurso, Curso> */
+    public function nivelCurso(): BelongsTo
     {
         return $this->belongsTo(NivelCurso::class, 'nivel_curso_id');
     }
@@ -105,7 +111,8 @@ class Curso extends Model
      * Inscritos con el pago aprobado, incluidos los que ya pasaron a otro
      * curso. Es lo que cuenta para cupo, mínimo, asistencia y reportes.
      */
-    public function estudiantes()
+    /** @phpstan-return BelongsToMany<Estudiante, Curso> */
+    public function estudiantes(): BelongsToMany
     {
         return $this->matriculas()->wherePivot('estado_pago', 'aprobado');
     }
@@ -114,7 +121,8 @@ class Curso extends Model
      * Todas las inscripciones, pagadas o no. Es el listado interno del curso
      * (admin e instructor); ahí figuran también quienes no han pagado.
      */
-    public function matriculas()
+    /** @phpstan-return BelongsToMany<Estudiante, Curso> */
+    public function matriculas(): BelongsToMany
     {
         return $this->belongsToMany(Estudiante::class, 'inscripciones')
             ->wherePivotNull('deleted_at')
@@ -122,12 +130,14 @@ class Curso extends Model
             ->withTimestamps();
     }
 
-    public function inscripciones()
+    /** @phpstan-return HasMany<Inscripcion, Curso> */
+    public function inscripciones(): HasMany
     {
         return $this->hasMany(Inscripcion::class);
     }
 
-    public function pagos()
+    /** @phpstan-return HasManyThrough<Pago, Inscripcion, Curso> */
+    public function pagos(): HasManyThrough
     {
         return $this->hasManyThrough(
             Pago::class,
@@ -139,12 +149,14 @@ class Curso extends Model
         );
     }
 
-    public function temario()
+    /** @phpstan-return HasMany<Temario, Curso> */
+    public function temario(): HasMany
     {
         return $this->hasMany(Temario::class)->orderBy('orden');
     }
 
-    public function sesiones()
+    /** @phpstan-return HasMany<Sesion, Curso> */
+    public function sesiones(): HasMany
     {
         return $this->hasMany(Sesion::class)->orderBy('fecha')->orderBy('hora_inicio');
     }

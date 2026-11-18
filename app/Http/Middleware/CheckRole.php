@@ -9,6 +9,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckRole
 {
+    /**
+     * @phpstan-param Request $request
+     * @phpstan-param Closure(Request): Response $next
+     * @phpstan-param string ...$roles
+     *
+     * @phpstan-return Response
+     */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         if (! $request->user() || ! in_array($request->user()->role, $roles)) {

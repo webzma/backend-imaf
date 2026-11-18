@@ -259,13 +259,15 @@ class EstudianteTest extends TestCase
     /**
      * Prepara un curso con su instructor autenticado, un estudiante inscrito
      * y una sesión realizada. Devuelve [estudiante, sesión].
+     *
+     * @return array{0: Estudiante, 1: Sesion}
      */
     private function prepararCursoConSesionRealizada(): array
     {
         $profesor = Profesor::factory()->create();
         $curso = Curso::factory()->create(['profesor_id' => $profesor->id]);
         $estudiante = Estudiante::factory()->enCurso($curso->id)->create();
-        $sesion = Sesion::create([
+        $sesion = Sesion::query()->create([
             'curso_id' => $curso->id,
             'titulo' => 'Clase 1',
             'fecha' => '2026-07-01',
@@ -292,7 +294,7 @@ class EstudianteTest extends TestCase
     public function test_no_se_puede_aprobar_estudiante_marcado_ausente(): void
     {
         [$estudiante, $sesion] = $this->prepararCursoConSesionRealizada();
-        Asistencia::create([
+        Asistencia::query()->create([
             'sesion_id' => $sesion->id,
             'estudiante_id' => $estudiante->id,
             'presente' => false,
@@ -306,7 +308,7 @@ class EstudianteTest extends TestCase
     public function test_se_puede_aprobar_estudiante_con_asistencia_completa(): void
     {
         [$estudiante, $sesion] = $this->prepararCursoConSesionRealizada();
-        Asistencia::create([
+        Asistencia::query()->create([
             'sesion_id' => $sesion->id,
             'estudiante_id' => $estudiante->id,
             'presente' => true,
@@ -333,19 +335,19 @@ class EstudianteTest extends TestCase
     public function test_sesiones_programadas_o_canceladas_no_bloquean_la_aprobacion(): void
     {
         [$estudiante, $sesion] = $this->prepararCursoConSesionRealizada();
-        Asistencia::create([
+        Asistencia::query()->create([
             'sesion_id' => $sesion->id,
             'estudiante_id' => $estudiante->id,
             'presente' => true,
         ]);
         // Sesiones futuras o canceladas sin asistencia registrada no cuentan
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $estudiante->curso_id,
             'titulo' => 'Clase futura',
             'fecha' => '2026-12-01',
             'estado' => 'programada',
         ]);
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $estudiante->curso_id,
             'titulo' => 'Clase cancelada',
             'fecha' => '2026-07-05',

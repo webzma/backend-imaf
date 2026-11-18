@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -68,10 +69,10 @@ class PerfilPropioTest extends TestCase
 
         $this->assertSame(0, $user->tokens()->count());
 
-        auth()->forgetGuards();
+        Auth::forgetGuards();
         $this->withToken($tokenActual)->getJson('/api/me')->assertUnauthorized();
 
-        auth()->forgetGuards();
+        Auth::forgetGuards();
         $this->withToken($tokenRobado)->getJson('/api/me')->assertUnauthorized();
     }
 

@@ -59,7 +59,7 @@ class SesionTest extends TestCase
     public function test_listar_sesiones_de_un_curso(): void
     {
         $curso = Curso::factory()->create();
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $curso->id,
             'titulo' => 'Sesión 1',
             'fecha' => '2026-07-02',
@@ -73,13 +73,13 @@ class SesionTest extends TestCase
     public function test_horario_global_devuelve_sesiones_con_curso_e_instructor(): void
     {
         $curso = Curso::factory()->create();
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $curso->id,
             'titulo' => 'Clase 1',
             'fecha' => '2026-05-01',
             'estado' => 'programada',
         ]);
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $curso->id,
             'titulo' => 'Clase 2',
             'fecha' => '2026-05-08',
@@ -97,13 +97,13 @@ class SesionTest extends TestCase
     public function test_horario_global_filtra_por_estado(): void
     {
         $curso = Curso::factory()->create();
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $curso->id,
             'titulo' => 'Programada',
             'fecha' => '2026-05-01',
             'estado' => 'programada',
         ]);
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $curso->id,
             'titulo' => 'Cancelada',
             'fecha' => '2026-05-08',
@@ -122,7 +122,7 @@ class SesionTest extends TestCase
         $cursoA = Curso::factory()->create(['profesor_id' => $profesor->id]);
         $cursoB = Curso::factory()->create(['profesor_id' => $profesor->id]);
 
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $cursoA->id,
             'titulo' => 'Clase existente',
             'fecha' => '2026-07-20',
@@ -146,7 +146,7 @@ class SesionTest extends TestCase
         $cursoA = Curso::factory()->create();
         $cursoB = Curso::factory()->create();
 
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $cursoA->id,
             'titulo' => 'Clase A',
             'fecha' => '2026-07-20',
@@ -169,7 +169,7 @@ class SesionTest extends TestCase
         $cursoA = Curso::factory()->create(['profesor_id' => $profesor->id]);
         $cursoB = Curso::factory()->create(['profesor_id' => $profesor->id]);
 
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $cursoA->id,
             'titulo' => 'Clase mañana',
             'fecha' => '2026-07-20',
@@ -192,7 +192,7 @@ class SesionTest extends TestCase
         $cursoA = Curso::factory()->create(['profesor_id' => $profesor->id]);
         $cursoB = Curso::factory()->create(['profesor_id' => $profesor->id]);
 
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $cursoA->id,
             'titulo' => 'Clase cancelada',
             'fecha' => '2026-07-20',
@@ -216,14 +216,14 @@ class SesionTest extends TestCase
         $cursoA = Curso::factory()->create(['profesor_id' => $profesor->id]);
         $cursoB = Curso::factory()->create(['profesor_id' => $profesor->id]);
 
-        Sesion::create([
+        Sesion::query()->create([
             'curso_id' => $cursoA->id,
             'titulo' => 'Clase fija',
             'fecha' => '2026-07-20',
             'hora_inicio' => '08:00',
             'hora_fin' => '10:00',
         ]);
-        $movible = Sesion::create([
+        $movible = Sesion::query()->create([
             'curso_id' => $cursoB->id,
             'titulo' => 'Clase movible',
             'fecha' => '2026-07-21',
@@ -240,7 +240,7 @@ class SesionTest extends TestCase
     public function test_editar_sesion_no_choca_consigo_misma(): void
     {
         $curso = Curso::factory()->create();
-        $sesion = Sesion::create([
+        $sesion = Sesion::query()->create([
             'curso_id' => $curso->id,
             'titulo' => 'Clase única',
             'fecha' => '2026-07-20',
@@ -256,7 +256,7 @@ class SesionTest extends TestCase
     public function test_admin_puede_eliminar_sesion(): void
     {
         $curso = Curso::factory()->create();
-        $sesion = Sesion::create([
+        $sesion = Sesion::query()->create([
             'curso_id' => $curso->id,
             'titulo' => 'A borrar',
             'fecha' => '2026-07-03',
@@ -271,7 +271,7 @@ class SesionTest extends TestCase
     public function test_la_sesion_toma_el_titulo_del_tema_elegido(): void
     {
         $curso = Curso::factory()->create();
-        $tema = Temario::create(['curso_id' => $curso->id, 'titulo' => 'Introducción al dibujo', 'orden' => 1]);
+        $tema = Temario::query()->create(['curso_id' => $curso->id, 'titulo' => 'Introducción al dibujo', 'orden' => 1]);
 
         $this->postJson("/api/admin/cursos/{$curso->id}/sesiones", [
             'temario_id' => $tema->id,
@@ -285,7 +285,7 @@ class SesionTest extends TestCase
     public function test_rechaza_un_tema_de_otro_curso(): void
     {
         $curso = Curso::factory()->create();
-        $ajeno = Temario::create(['curso_id' => Curso::factory()->create()->id, 'titulo' => 'Ajeno', 'orden' => 1]);
+        $ajeno = Temario::query()->create(['curso_id' => Curso::factory()->create()->id, 'titulo' => 'Ajeno', 'orden' => 1]);
 
         $this->postJson('/api/admin/sesiones', [
             'curso_id' => $curso->id,
@@ -310,7 +310,7 @@ class SesionTest extends TestCase
     public function test_renombrar_el_tema_actualiza_sus_sesiones(): void
     {
         $curso = Curso::factory()->create();
-        $tema = Temario::create(['curso_id' => $curso->id, 'titulo' => 'Tema viejo', 'orden' => 1]);
+        $tema = Temario::query()->create(['curso_id' => $curso->id, 'titulo' => 'Tema viejo', 'orden' => 1]);
         $sesion = $this->postJson("/api/admin/cursos/{$curso->id}/sesiones", [
             'temario_id' => $tema->id,
             'fecha' => '2026-10-21',
@@ -324,7 +324,7 @@ class SesionTest extends TestCase
     public function test_editar_sin_cambiar_el_titulo_lo_conserva(): void
     {
         $curso = Curso::factory()->create();
-        $tema = Temario::create(['curso_id' => $curso->id, 'titulo' => 'Color', 'orden' => 1]);
+        $tema = Temario::query()->create(['curso_id' => $curso->id, 'titulo' => 'Color', 'orden' => 1]);
         $sesion = $this->postJson("/api/admin/cursos/{$curso->id}/sesiones", [
             'temario_id' => $tema->id,
             'fecha' => '2026-10-21',
