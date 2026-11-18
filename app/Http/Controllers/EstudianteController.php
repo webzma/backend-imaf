@@ -13,6 +13,7 @@ use App\Services\Auditoria;
 use App\Services\CedulaEstudiante;
 use Cloudinary\Cloudinary as CloudinaryClient;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -31,7 +32,8 @@ class EstudianteController extends Controller
         'estado' => 'estado',
     ];
 
-    public function index(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function index(Request $request): JsonResponse
     {
         $query = Estudiante::query()->with('user', 'curso');
 
@@ -93,8 +95,10 @@ class EstudianteController extends Controller
      * Las tarjetas de resumen contaban sobre los 10 registros cargados, así
      * que con 300 estudiantes decían "10". Respeta los mismos filtros que
      * `index` para que el resumen describa lo que se está viendo.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function resumen(Request $request)
+    public function resumen(Request $request): JsonResponse
     {
         $query = Estudiante::query();
         $this->acotarAlProfesor($query, $request->user());
@@ -111,7 +115,8 @@ class EstudianteController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function store(Request $request): JsonResponse
     {
         $request->validate(
             [
@@ -225,8 +230,10 @@ class EstudianteController extends Controller
      * `update` exige el registro completo (municipio y dirección incluidos),
      * así que no servía para tocar solo el estado: graduar a una promoción
      * obligaba a abrir y reenviar quince formularios enteros.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function estadoMasivo(Request $request)
+    public function estadoMasivo(Request $request): JsonResponse
     {
         $datos = $request->validate([
             'ids' => 'required|array|min:1|max:200',
@@ -246,7 +253,8 @@ class EstudianteController extends Controller
         return response()->json(['actualizados' => $actualizados]);
     }
 
-    public function showMe()
+    /** @phpstan-return JsonResponse */
+    public function showMe(): JsonResponse
     {
         /** @var Estudiante $estudiante */
         $estudiante = Estudiante::query()->with('user', 'curso.instructor.user')
@@ -264,8 +272,10 @@ class EstudianteController extends Controller
     /**
      * Detalle del curso actual o, con `?curso_id=`, de cualquier curso en el
      * que el estudiante esté o haya estado inscrito.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function miCurso(Request $request)
+    public function miCurso(Request $request): JsonResponse
     {
         /** @var Estudiante $estudiante */
         $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
@@ -360,8 +370,10 @@ class EstudianteController extends Controller
     /**
      * Todos los cursos del estudiante (actual y anteriores) y las solicitudes
      * de inscripción que siguen esperando la revisión del pago.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function misCursos()
+    public function misCursos(): JsonResponse
     {
         /** @var Estudiante $estudiante */
         $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
@@ -406,7 +418,8 @@ class EstudianteController extends Controller
         ]);
     }
 
-    public function updateMe(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function updateMe(Request $request): JsonResponse
     {
         /** @var Estudiante $estudiante */
         $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
@@ -436,7 +449,8 @@ class EstudianteController extends Controller
         );
     }
 
-    public function uploadFotoMe(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function uploadFotoMe(Request $request): JsonResponse
     {
         $request->validate([
             'foto' => 'required|image|mimes:jpeg,jpg,png,webp|max:2048',
@@ -484,8 +498,10 @@ class EstudianteController extends Controller
 
     /**
      * El estudiante reemplaza la imagen de su cédula desde su perfil.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function uploadCedulaMe(Request $request)
+    public function uploadCedulaMe(Request $request): JsonResponse
     {
         $request->validate(
             ['foto_cedula' => 'required|'.self::REGLAS_FOTO_CEDULA],
@@ -508,7 +524,8 @@ class EstudianteController extends Controller
         );
     }
 
-    public function show(Request $request, string $id)
+    /** @phpstan-return JsonResponse */
+    public function show(Request $request, string $id): JsonResponse
     {
         $query = Estudiante::query()->with('user', 'curso', 'cursos.instructor.user');
 
@@ -524,6 +541,12 @@ class EstudianteController extends Controller
         return response()->json($estudiante);
     }
 
+    /**
+     * @phpstan-param Builder<Estudiante> $query
+     * @phpstan-param string $estado
+     *
+     * @phpstan-return void
+     */
     private function filtrarPorEstadoPago(Builder $query, string $estado): void
     {
         $query->whereRaw(
@@ -558,6 +581,11 @@ class EstudianteController extends Controller
      * por admin y profesor. Sin este filtro un instructor podría leer la cédula,
      * la dirección y el teléfono de toda la base, no solo de sus alumnos. El
      * admin conserva la vista completa.
+     *
+     * @phpstan-param Builder<Estudiante> $query
+     * @phpstan-param User|null $usuario
+     *
+     * @phpstan-return void
      */
     private function acotarAlProfesor(Builder $query, ?User $usuario): void
     {
@@ -573,7 +601,8 @@ class EstudianteController extends Controller
         );
     }
 
-    public function update(Request $request, string $id)
+    /** @phpstan-return JsonResponse */
+    public function update(Request $request, string $id): JsonResponse
     {
         /** @var Estudiante $estudiante */
         $estudiante = Estudiante::query()->findOrFail($id);
@@ -692,7 +721,8 @@ class EstudianteController extends Controller
         );
     }
 
-    public function destroy(string $id)
+    /** @phpstan-return JsonResponse */
+    public function destroy(string $id): JsonResponse
     {
         Estudiante::query()->findOrFail($id)->delete();
 
@@ -703,8 +733,10 @@ class EstudianteController extends Controller
 
     /**
      * Admin: aprueba o rechaza el pago (acceso al curso).
+     *
+     * @phpstan-return JsonResponse
      */
-    public function updateEstadoPago(Request $request, string $id)
+    public function updateEstadoPago(Request $request, string $id): JsonResponse
     {
         /** @var Estudiante $estudiante */
         $estudiante = Estudiante::query()->with('user', 'curso')->findOrFail($id);
@@ -747,8 +779,10 @@ class EstudianteController extends Controller
 
     /**
      * Profesor: aprueba o rechaza la finalización del curso (certificado).
+     *
+     * @phpstan-return JsonResponse
      */
-    public function updateAprobacionCurso(Request $request, string $id)
+    public function updateAprobacionCurso(Request $request, string $id): JsonResponse
     {
         /** @var Estudiante $estudiante */
         $estudiante = Estudiante::query()->with('user')->findOrFail($id);
