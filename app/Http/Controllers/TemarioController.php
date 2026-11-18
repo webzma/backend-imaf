@@ -5,13 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Curso;
 use App\Models\Temario;
 use App\Notifications\GenericNotification;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class TemarioController extends Controller
 {
-    private function notifyInstructor(string $cursoId, string $accion)
+    /** @phpstan-return void */
+    private function notifyInstructor(string $cursoId, string $accion): void
     {
-        $curso = Curso::with('instructor.user')->find($cursoId);
+        /** @var Curso|null $curso */
+        $curso = Curso::query()->with('instructor.user')->find($cursoId);
         if ($curso && $curso->instructor && $curso->instructor->user) {
             $curso->instructor->user->notify(new GenericNotification(
                 'Temario Actualizado',
@@ -21,18 +24,20 @@ class TemarioController extends Controller
         }
     }
 
-    public function index(string $cursoId)
+    /** @phpstan-return JsonResponse */
+    public function index(string $cursoId): JsonResponse
     {
-        Curso::findOrFail($cursoId);
+        Curso::query()->findOrFail($cursoId);
 
         return response()->json(
-            Temario::where('curso_id', $cursoId)->orderBy('orden')->get()
+            Temario::query()->where('curso_id', $cursoId)->orderBy('orden')->get()
         );
     }
 
-    public function store(Request $request, string $cursoId)
+    /** @phpstan-return JsonResponse */
+    public function store(Request $request, string $cursoId): JsonResponse
     {
-        Curso::findOrFail($cursoId);
+        Curso::query()->findOrFail($cursoId);
 
         $data = $request->validate([
             'titulo' => 'required|string|max:255',
@@ -41,19 +46,22 @@ class TemarioController extends Controller
         ]);
 
         if (! isset($data['orden'])) {
-            $data['orden'] = Temario::where('curso_id', $cursoId)->max('orden') + 1;
+            $data['orden'] = Temario::query()->where('curso_id', $cursoId)->max('orden') + 1;
         }
 
-        $temario = Temario::create(['curso_id' => $cursoId, ...$data]);
+        /** @var Temario $temario */
+        $temario = Temario::query()->create(['curso_id' => $cursoId, ...$data]);
 
         $this->notifyInstructor($cursoId, 'agregado');
 
         return response()->json($temario, 201);
     }
 
-    public function update(Request $request, string $cursoId, string $id)
+    /** @phpstan-return JsonResponse */
+    public function update(Request $request, string $cursoId, string $id): JsonResponse
     {
-        $temario = Temario::where('curso_id', $cursoId)->findOrFail($id);
+        /** @var Temario $temario */
+        $temario = Temario::query()->where('curso_id', $cursoId)->findOrFail($id);
 
         $data = $request->validate([
             'titulo' => 'sometimes|string|max:255',
@@ -73,9 +81,11 @@ class TemarioController extends Controller
         return response()->json($temario);
     }
 
-    public function destroy(string $cursoId, string $id)
+    /** @phpstan-return JsonResponse */
+    public function destroy(string $cursoId, string $id): JsonResponse
     {
-        $temario = Temario::where('curso_id', $cursoId)->findOrFail($id);
+        /** @var Temario $temario */
+        $temario = Temario::query()->where('curso_id', $cursoId)->findOrFail($id);
         $temario->delete();
 
         $this->notifyInstructor($cursoId, 'eliminado');

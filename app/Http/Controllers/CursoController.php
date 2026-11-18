@@ -31,7 +31,7 @@ class CursoController extends Controller
     {
         CursoEstadoService::sincronizarConCache();
 
-        $query = Curso::with('instructor.user', 'nivelCurso', 'estudiantes.user');
+        $query = Curso::query()->with('instructor.user', 'nivelCurso', 'estudiantes.user');
 
         $this->acotarAlProfesor($query, $request->user());
 
@@ -64,11 +64,11 @@ class CursoController extends Controller
     public function resumen()
     {
         return response()->json([
-            'total' => Curso::count(),
-            'activos' => Curso::where('estado', 'activo')->count(),
-            'inactivos' => Curso::where('estado', 'inactivo')->count(),
-            'estudiantes' => Estudiante::has('cursos')->count(),
-            'con_estudiantes' => Curso::has('estudiantes')->count(),
+            'total' => Curso::query()->count(),
+            'activos' => Curso::query()->where('estado', 'activo')->count(),
+            'inactivos' => Curso::query()->where('estado', 'inactivo')->count(),
+            'estudiantes' => Estudiante::query()->has('cursos')->count(),
+            'con_estudiantes' => Curso::query()->has('estudiantes')->count(),
         ]);
     }
 
@@ -77,7 +77,7 @@ class CursoController extends Controller
         CursoEstadoService::sincronizarConCache();
 
         return response()->json(
-            Curso::with('instructor.user', 'nivelCurso')
+            Curso::query()->with('instructor.user', 'nivelCurso')
                 ->where('estado', 'activo')
                 ->latest('id')
                 ->paginate($this->registrosPorPagina($request, self::MAX_PER_PAGE_CATALOGO))
@@ -86,9 +86,9 @@ class CursoController extends Controller
 
     public function misCursos(Request $request)
     {
-        $profesor = Profesor::where('user_id', $request->user()->id)->firstOrFail();
+        $profesor = Profesor::query()->where('user_id', $request->user()->id)->firstOrFail();
 
-        $cursos = Curso::where('profesor_id', $profesor->id)
+        $cursos = Curso::query()->where('profesor_id', $profesor->id)
             ->latest('id')
             ->paginate($this->registrosPorPagina($request, self::MAX_PER_PAGE_CATALOGO));
 
@@ -118,10 +118,10 @@ class CursoController extends Controller
             'estado' => 'in:activo,inactivo',
         ]);
 
-        $curso = Curso::create($data);
+        $curso = Curso::query()->create($data);
 
         // Notificar al profesor asignado
-        $profesor = Profesor::with('user')->find($curso->profesor_id);
+        $profesor = Profesor::query()->with('user')->find($curso->profesor_id);
         if ($profesor && $profesor->user) {
             $profesor->user->notify(new GenericNotification(
                 'Asignación de Curso',
@@ -135,7 +135,7 @@ class CursoController extends Controller
 
     public function show(Request $request, string $id)
     {
-        $curso = Curso::with('instructor.user', 'nivelCurso', 'temario', 'sesiones')->findOrFail($id);
+        $curso = Curso::query()->with('instructor.user', 'nivelCurso', 'temario', 'sesiones')->findOrFail($id);
 
         $usuario = $request->user();
         $esProfesor = $usuario?->isProfesor() ?? false;
@@ -183,8 +183,8 @@ class CursoController extends Controller
         ]);
 
         return DB::transaction(function () use ($id, $data) {
-            $curso = Curso::lockForUpdate()->findOrFail($id);
-            $estudiante = Estudiante::findOrFail($data['estudiante_id']);
+            $curso = Curso::query()->lockForUpdate()->findOrFail($id);
+            $estudiante = Estudiante::query()->findOrFail($data['estudiante_id']);
 
             $yaInscrito = $curso->estudiantes()->whereKey($estudiante->id)->exists();
             if (! $yaInscrito && $curso->estudiantes()->count() >= $curso->limite_cupo) {
@@ -210,8 +210,8 @@ class CursoController extends Controller
      */
     public function quitarEstudiante(string $id, string $estudianteId)
     {
-        $curso = Curso::findOrFail($id);
-        $estudiante = Estudiante::withTrashed()->findOrFail($estudianteId);
+        $curso = Curso::query()->findOrFail($id);
+        $estudiante = Estudiante::query()->withTrashed()->findOrFail($estudianteId);
 
         $estudiante->quitarDeCurso($curso->id);
 
@@ -247,7 +247,7 @@ class CursoController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $curso = Curso::findOrFail($id);
+        $curso = Curso::query()->findOrFail($id);
 
         $data = $request->validate([
             'profesor_id' => ['sometimes', Rule::exists('profesores', 'id')],
@@ -278,7 +278,7 @@ class CursoController extends Controller
 
         // Notificar al profesor si el estado del curso cambió
         if (isset($data['estado']) && $data['estado'] !== $oldEstado) {
-            $profesor = Profesor::with('user')->find($curso->profesor_id);
+            $profesor = Profesor::query()->with('user')->find($curso->profesor_id);
             if ($profesor && $profesor->user) {
                 $estadoTexto = $data['estado'] === 'activo' ? 'activado' : 'inactivado';
                 $profesor->user->notify(new GenericNotification(
@@ -291,7 +291,7 @@ class CursoController extends Controller
 
         // Si se cambió el profesor, notificar al nuevo profesor
         if (isset($data['profesor_id']) && (int) $data['profesor_id'] !== (int) $oldProfesorId) {
-            $profesor = Profesor::with('user')->find($data['profesor_id']);
+            $profesor = Profesor::query()->with('user')->find($data['profesor_id']);
             if ($profesor && $profesor->user) {
                 $profesor->user->notify(new GenericNotification(
                     'Asignación de Curso',
@@ -306,7 +306,7 @@ class CursoController extends Controller
 
     public function destroy(string $id)
     {
-        Curso::findOrFail($id)->delete();
+        Curso::query()->findOrFail($id)->delete();
 
         return response()->json(['message' => 'Curso eliminado correctamente.']);
     }

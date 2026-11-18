@@ -6,12 +6,16 @@ use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\Pago;
 use App\Models\Profesor;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * @phpstan-return JsonResponse
+     */
+    public function index(Request $request): JsonResponse
     {
         $contexto = [
             'user_id' => $request->user()?->id,
@@ -30,10 +34,10 @@ class DashboardController extends Controller
             Log::info('DASHBOARD_DB_INICIO', ['paso' => $paso]);
             $inicio = microtime(true);
             $estudiantes = [
-                'total' => Estudiante::count(),
-                'activos' => Estudiante::where('estado', 'activo')->count(),
-                'inactivos' => Estudiante::where('estado', 'inactivo')->count(),
-                'graduados' => Estudiante::where('estado', 'graduado')->count(),
+                'total' => Estudiante::query()->count(),
+                'activos' => Estudiante::query()->where('estado', 'activo')->count(),
+                'inactivos' => Estudiante::query()->where('estado', 'inactivo')->count(),
+                'graduados' => Estudiante::query()->where('estado', 'graduado')->count(),
             ];
             Log::info('DASHBOARD_DB_FIN', [
                 'paso' => $paso,
@@ -45,10 +49,10 @@ class DashboardController extends Controller
             Log::info('DASHBOARD_DB_INICIO', ['paso' => $paso]);
             $inicio = microtime(true);
             $pagos = [
-                'total' => Pago::count(),
-                'pendientes' => Pago::where('estado', 'pendiente')->count(),
-                'aprobados' => Pago::where('estado', 'aprobado')->count(),
-                'rechazados' => Pago::where('estado', 'rechazado')->count(),
+                'total' => Pago::query()->count(),
+                'pendientes' => Pago::query()->where('estado', 'pendiente')->count(),
+                'aprobados' => Pago::query()->where('estado', 'aprobado')->count(),
+                'rechazados' => Pago::query()->where('estado', 'rechazado')->count(),
             ];
             Log::info('DASHBOARD_DB_FIN', [
                 'paso' => $paso,
@@ -59,9 +63,9 @@ class DashboardController extends Controller
             $paso = 'cursos';
             Log::info('DASHBOARD_DB_INICIO', ['paso' => $paso]);
             $inicio = microtime(true);
-            $cursosTotal = Curso::count();
-            $cursosActivos = Curso::where('estado', 'activo')->count();
-            $cursosConCupo = Curso::where('estado', 'activo')
+            $cursosTotal = Curso::query()->count();
+            $cursosActivos = Curso::query()->where('estado', 'activo')->count();
+            $cursosConCupo = Curso::query()->where('estado', 'activo')
                 ->withCount('estudiantes')
                 ->get()
                 ->filter(fn ($c) => $c->cupos_restantes > 0)
@@ -77,7 +81,7 @@ class DashboardController extends Controller
             $paso = 'profesores';
             Log::info('DASHBOARD_DB_INICIO', ['paso' => $paso]);
             $inicio = microtime(true);
-            $profesoresTotal = Profesor::count();
+            $profesoresTotal = Profesor::query()->count();
             Log::info('DASHBOARD_DB_FIN', [
                 'paso' => $paso,
                 'duracion_ms' => $this->milisegundos($inicio),
@@ -87,7 +91,7 @@ class DashboardController extends Controller
             $paso = 'ingresos_por_curso';
             Log::info('DASHBOARD_DB_INICIO', ['paso' => $paso]);
             $inicio = microtime(true);
-            $ingresosPorCurso = Curso::withCount([
+            $ingresosPorCurso = Curso::query()->withCount([
                 'estudiantes',
                 'pagos as pagos_aprobados_count' => fn ($q) => $q->where('estado', 'aprobado'),
             ])

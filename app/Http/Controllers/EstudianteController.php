@@ -11,12 +11,15 @@ use App\Models\User;
 use App\Notifications\SolicitudCursoProcesada;
 use App\Services\Auditoria;
 use App\Services\CedulaEstudiante;
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Cloudinary\Cloudinary as CloudinaryClient;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class EstudianteController extends Controller
 {
@@ -30,7 +33,7 @@ class EstudianteController extends Controller
 
     public function index(Request $request)
     {
-        $query = Estudiante::with('user', 'curso');
+        $query = Estudiante::query()->with('user', 'curso');
 
         $this->acotarAlProfesor($query, $request->user());
 
@@ -66,7 +69,7 @@ class EstudianteController extends Controller
         }
 
         if ($request->filled('estado_pago')) {
-            $query->conEstadoPago($request->estado_pago);
+            $this->filtrarPorEstadoPago($query, $request->estado_pago);
         }
 
         $this->aplicarOrden($query, $request, self::ORDEN_ESTUDIANTES, 'nombre');
@@ -169,8 +172,9 @@ class EstudianteController extends Controller
             array_merge($this->mensajesTipoDato(), $this->mensajesFotoCedula()),
         );
 
+        /** @var Estudiante $estudiante */
         $estudiante = DB::transaction(function () use ($request) {
-            $user = User::create([
+            $user = User::query()->create([
                 'primer_nombre' => $request->primer_nombre,
                 'segundo_nombre' => $request->segundo_nombre,
                 'primer_apellido' => $request->primer_apellido,
@@ -180,7 +184,8 @@ class EstudianteController extends Controller
                 'role' => 'estudiante',
             ]);
 
-            $estudiante = Estudiante::create([
+            /** @var Estudiante $estudiante */
+            $estudiante = Estudiante::query()->create([
                 'user_id' => $user->id,
                 'nombre' => $user->name,
                 'nacionalidad' => $request->nacionalidad,
@@ -200,7 +205,7 @@ class EstudianteController extends Controller
 
             $estudiante->update([
                 'foto_cedula' => CedulaEstudiante::subir(
-                    $request->file('foto_cedula'),
+                    $this->archivoRequerido($request, 'foto_cedula'),
                     $estudiante->id,
                 ),
             ]);
@@ -229,7 +234,7 @@ class EstudianteController extends Controller
             'estado' => 'required|in:activo,inactivo,graduado',
         ]);
 
-        $actualizados = Estudiante::whereIn('id', $datos['ids'])
+        $actualizados = Estudiante::query()->whereIn('id', $datos['ids'])
             ->update(['estado' => $datos['estado']]);
 
         // Actualización masiva: no dispara eventos de modelo, así que se
@@ -243,7 +248,8 @@ class EstudianteController extends Controller
 
     public function showMe()
     {
-        $estudiante = Estudiante::with('user', 'curso.instructor.user')
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->with('user', 'curso.instructor.user')
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
@@ -261,7 +267,8 @@ class EstudianteController extends Controller
      */
     public function miCurso(Request $request)
     {
-        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
 
         $actual = $estudiante->cursoActual();
 
@@ -356,7 +363,8 @@ class EstudianteController extends Controller
      */
     public function misCursos()
     {
-        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
         $actualId = $estudiante->cursoActual()?->id;
 
         $cursos = $estudiante->cursos()
@@ -378,8 +386,8 @@ class EstudianteController extends Controller
                 'es_actual' => (int) $curso->id === (int) $actualId,
             ]);
 
-        $pendientes = Pago::with('inscripcion', 'curso:cursos.id,cursos.codigo,cursos.nombre')
-            ->deUsuario($estudiante->user_id)
+        $pendientes = Pago::query()->with('inscripcion', 'curso:cursos.id,cursos.codigo,cursos.nombre')
+            ->whereHas('inscripcion.estudiante', fn (Builder $e) => $e->where('user_id', $estudiante->user_id))
             ->where('estado', 'pendiente')
             ->whereHas('inscripcion', fn (Builder $i) => $i->whereNotIn('curso_id', $cursos->pluck('id')))
             ->latest()
@@ -400,7 +408,8 @@ class EstudianteController extends Controller
 
     public function updateMe(Request $request)
     {
-        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
         $id = $estudiante->id;
 
         $data = $request->validate(
@@ -433,11 +442,12 @@ class EstudianteController extends Controller
             'foto' => 'required|image|mimes:jpeg,jpg,png,webp|max:2048',
         ]);
 
-        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
 
         try {
-            $upload = Cloudinary::uploadApi()->upload(
-                $request->file('foto')->getRealPath(),
+            $upload = app(CloudinaryClient::class)->uploadApi()->upload(
+                $this->archivoRequerido($request, 'foto')->getRealPath(),
                 [
                     'folder' => 'imaf/perfiles',
                     'public_id' => 'estudiante_'.$estudiante->id,
@@ -452,7 +462,7 @@ class EstudianteController extends Controller
                 ],
             );
         } catch (\Throwable $e) {
-            \Log::error(
+            Log::error(
                 'Error subiendo foto de estudiante: '.$e->getMessage(),
             );
 
@@ -482,11 +492,12 @@ class EstudianteController extends Controller
             $this->mensajesFotoCedula(),
         );
 
-        $estudiante = Estudiante::where('user_id', Auth::id())->firstOrFail();
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->where('user_id', Auth::id())->firstOrFail();
 
         $estudiante->update([
             'foto_cedula' => CedulaEstudiante::subir(
-                $request->file('foto_cedula'),
+                $this->archivoRequerido($request, 'foto_cedula'),
                 $estudiante->id,
             ),
         ]);
@@ -499,10 +510,11 @@ class EstudianteController extends Controller
 
     public function show(Request $request, string $id)
     {
-        $query = Estudiante::with('user', 'curso', 'cursos.instructor.user');
+        $query = Estudiante::query()->with('user', 'curso', 'cursos.instructor.user');
 
         $this->acotarAlProfesor($query, $request->user());
 
+        /** @var Estudiante $estudiante */
         $estudiante = $query->findOrFail($id);
 
         if ($request->user()?->isAdmin()) {
@@ -510,6 +522,32 @@ class EstudianteController extends Controller
         }
 
         return response()->json($estudiante);
+    }
+
+    private function filtrarPorEstadoPago(Builder $query, string $estado): void
+    {
+        $query->whereRaw(
+            "COALESCE((
+                SELECT i.estado_pago FROM inscripciones i
+                WHERE i.estudiante_id = estudiantes.id AND i.deleted_at IS NULL
+                ORDER BY i.es_actual DESC, i.updated_at DESC, i.id DESC
+                LIMIT 1
+            ), 'pendiente') = ?",
+            [$estado],
+        );
+    }
+
+    private function archivoRequerido(Request $request, string $campo): UploadedFile
+    {
+        $archivo = $request->file($campo);
+
+        if (! $archivo instanceof UploadedFile) {
+            throw ValidationException::withMessages([
+                $campo => ['El archivo es obligatorio.'],
+            ]);
+        }
+
+        return $archivo;
     }
 
     /**
@@ -537,7 +575,8 @@ class EstudianteController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $estudiante = Estudiante::findOrFail($id);
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->findOrFail($id);
 
         $data = $request->validate(
             [
@@ -604,7 +643,7 @@ class EstudianteController extends Controller
 
         if ($request->hasFile('foto_cedula')) {
             $data['foto_cedula'] = CedulaEstudiante::subir(
-                $request->file('foto_cedula'),
+                $this->archivoRequerido($request, 'foto_cedula'),
                 $estudiante->id,
             );
         } else {
@@ -655,7 +694,7 @@ class EstudianteController extends Controller
 
     public function destroy(string $id)
     {
-        Estudiante::findOrFail($id)->delete();
+        Estudiante::query()->findOrFail($id)->delete();
 
         return response()->json([
             'message' => 'Estudiante eliminado correctamente.',
@@ -667,7 +706,8 @@ class EstudianteController extends Controller
      */
     public function updateEstadoPago(Request $request, string $id)
     {
-        $estudiante = Estudiante::with('user', 'curso')->findOrFail($id);
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->with('user', 'curso')->findOrFail($id);
 
         $data = $request->validate([
             'estado_pago' => 'required|in:pendiente,aprobado,rechazado',
@@ -710,7 +750,8 @@ class EstudianteController extends Controller
      */
     public function updateAprobacionCurso(Request $request, string $id)
     {
-        $estudiante = Estudiante::with('user')->findOrFail($id);
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->with('user')->findOrFail($id);
 
         // Sin `curso_id` se asume el curso actual del estudiante.
         $cursoId = $request->filled('curso_id')
@@ -743,11 +784,11 @@ class EstudianteController extends Controller
 
         // Solo se puede aprobar si asistió a todas las sesiones realizadas del curso
         if ($data['estado_aprobacion_curso'] === 'aprobado') {
-            $sesionesRealizadas = Sesion::where('curso_id', $curso->id)
+            $sesionesRealizadas = Sesion::query()->where('curso_id', $curso->id)
                 ->where('estado', 'realizada')
                 ->pluck('id');
 
-            $presentes = Asistencia::where('estudiante_id', $estudiante->id)
+            $presentes = Asistencia::query()->where('estudiante_id', $estudiante->id)
                 ->whereIn('sesion_id', $sesionesRealizadas)
                 ->where('presente', true)
                 ->count();
@@ -782,7 +823,7 @@ class EstudianteController extends Controller
             ]);
         }
 
-        Inscripcion::where('estudiante_id', $estudiante->id)
+        Inscripcion::query()->where('estudiante_id', $estudiante->id)
             ->where('curso_id', $curso->id)
             ->update(['estado_aprobacion_curso' => $nuevoEstado]);
 

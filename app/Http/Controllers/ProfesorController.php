@@ -8,23 +8,29 @@ use App\Models\Profesor;
 use App\Models\TipoContrato;
 use App\Models\Titulo;
 use App\Models\User;
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Cloudinary\Cloudinary as CloudinaryClient;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class ProfesorController extends Controller
 {
     /**
      * Columnas ordenables. El nombre vive en `users`, así que se ordena por
      * subconsulta en vez de arrastrar un join a toda la lista.
+     *
+     * @return array<string,mixed>
      */
     private function ordenProfesores(): array
     {
         return [
             'nombre' => fn ($q, $dir) => $q->orderBy(
-                User::select('name')->whereColumn('users.id', 'profesores.user_id'),
+                User::query()->select('name')->whereColumn('users.id', 'profesores.user_id'),
                 $dir
             ),
             'cedula' => 'cedula',
@@ -32,9 +38,10 @@ class ProfesorController extends Controller
         ];
     }
 
-    public function index(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function index(Request $request): JsonResponse
     {
-        $query = Profesor::with('user', 'tipoContrato', 'especialidad', 'departamento', 'titulo');
+        $query = Profesor::query()->with('user', 'tipoContrato', 'especialidad', 'departamento', 'titulo');
 
         // Los filtros se resuelven en la base de datos. Antes la pantalla
         // filtraba en memoria sobre los 10 registros de la página actual, de
@@ -70,16 +77,20 @@ class ProfesorController extends Controller
         return response()->json($query->paginate($this->registrosPorPagina($request)));
     }
 
-    /** Totales sobre la tabla completa, para las tarjetas de resumen. */
-    public function resumen()
+    /**
+     * Totales sobre la tabla completa, para las tarjetas de resumen.
+     *
+     * @phpstan-return JsonResponse
+     */
+    public function resumen(): JsonResponse
     {
         return response()->json([
-            'total' => Profesor::count(),
-            'con_titulo' => Profesor::whereNotNull('titulo_id')->count(),
-            'departamentos' => Profesor::whereNotNull('departamento_id')
+            'total' => Profesor::query()->count(),
+            'con_titulo' => Profesor::query()->whereNotNull('titulo_id')->count(),
+            'departamentos' => Profesor::query()->whereNotNull('departamento_id')
                 ->distinct('departamento_id')
                 ->count('departamento_id'),
-            'con_contrato' => Profesor::whereNotNull('tipo_contrato_id')->count(),
+            'con_contrato' => Profesor::query()->whereNotNull('tipo_contrato_id')->count(),
         ]);
     }
 
@@ -89,27 +100,32 @@ class ProfesorController extends Controller
      * avisar cuántos instructores usan cada opción antes de borrarla.
      */
 
-    public function getTipoContratos()
+    /** @phpstan-return JsonResponse */
+    public function getTipoContratos(): JsonResponse
     {
-        return response()->json(TipoContrato::withCount('profesores')->orderBy('nombre')->get());
+        return response()->json(TipoContrato::query()->withCount('profesores')->orderBy('nombre')->get());
     }
 
-    public function getEspecialidades()
+    /** @phpstan-return JsonResponse */
+    public function getEspecialidades(): JsonResponse
     {
-        return response()->json(Especialidad::withCount('profesores')->orderBy('nombre')->get());
+        return response()->json(Especialidad::query()->withCount('profesores')->orderBy('nombre')->get());
     }
 
-    public function getDepartamentos()
+    /** @phpstan-return JsonResponse */
+    public function getDepartamentos(): JsonResponse
     {
-        return response()->json(Departamento::withCount('profesores')->orderBy('nombre')->get());
+        return response()->json(Departamento::query()->withCount('profesores')->orderBy('nombre')->get());
     }
 
-    public function getTitulos()
+    /** @phpstan-return JsonResponse */
+    public function getTitulos(): JsonResponse
     {
-        return response()->json(Titulo::withCount('profesores')->orderBy('nombre')->get());
+        return response()->json(Titulo::query()->withCount('profesores')->orderBy('nombre')->get());
     }
 
-    public function store(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function store(Request $request): JsonResponse
     {
         $request->validate([
             'primer_nombre' => ['required', 'string', 'max:100', self::REGEX_NOMBRES],
@@ -130,8 +146,9 @@ class ProfesorController extends Controller
             'tipo_contrato_id' => 'required|exists:tipos_contrato,id',
         ], $this->mensajesTipoDato());
 
+        /** @var Profesor $profesor */
         $profesor = DB::transaction(function () use ($request) {
-            $user = User::create([
+            $user = User::query()->create([
                 'primer_nombre' => $request->primer_nombre,
                 'segundo_nombre' => $request->segundo_nombre,
                 'primer_apellido' => $request->primer_apellido,
@@ -141,7 +158,8 @@ class ProfesorController extends Controller
                 'role' => 'profesor',
             ]);
 
-            return Profesor::create([
+            /** @var Profesor $profesor */
+            $profesor = Profesor::query()->create([
                 'user_id' => $user->id,
                 'nacionalidad' => $request->nacionalidad,
                 'cedula' => $request->cedula,
@@ -154,21 +172,27 @@ class ProfesorController extends Controller
                 'genero' => $request->genero,
                 'tipo_contrato_id' => $request->tipo_contrato_id,
             ]);
+
+            return $profesor;
         });
 
         return response()->json($profesor->load('user', 'tipoContrato', 'especialidad', 'departamento', 'titulo'), 201);
     }
 
-    public function show(string $id)
+    /** @phpstan-return JsonResponse */
+    public function show(string $id): JsonResponse
     {
-        $profesor = Profesor::with('user', 'cursos', 'tipoContrato', 'especialidad', 'departamento', 'titulo')->findOrFail($id);
+        /** @var Profesor $profesor */
+        $profesor = Profesor::query()->with('user', 'cursos', 'tipoContrato', 'especialidad', 'departamento', 'titulo')->findOrFail($id);
 
         return response()->json($profesor);
     }
 
-    public function update(Request $request, string $id)
+    /** @phpstan-return JsonResponse */
+    public function update(Request $request, string $id): JsonResponse
     {
-        $profesor = Profesor::with('user')->findOrFail($id);
+        /** @var Profesor $profesor */
+        $profesor = Profesor::query()->with('user')->findOrFail($id);
         $authUser = Auth::user();
 
         $isAdmin = $authUser->role === 'admin';
@@ -217,17 +241,19 @@ class ProfesorController extends Controller
         return response()->json($profesor->load('user', 'tipoContrato', 'especialidad', 'departamento', 'titulo'));
     }
 
-    public function uploadFotoMe(Request $request)
+    /** @phpstan-return JsonResponse */
+    public function uploadFotoMe(Request $request): JsonResponse
     {
         $request->validate([
             'foto' => 'required|image|mimes:jpeg,jpg,png,webp|max:2048',
         ]);
 
-        $profesor = Profesor::where('user_id', Auth::id())->firstOrFail();
+        /** @var Profesor $profesor */
+        $profesor = Profesor::query()->where('user_id', Auth::id())->firstOrFail();
 
         try {
-            $upload = Cloudinary::uploadApi()->upload(
-                $request->file('foto')->getRealPath(),
+            $upload = app(CloudinaryClient::class)->uploadApi()->upload(
+                $this->archivoRequerido($request, 'foto')->getRealPath(),
                 [
                     'folder' => 'imaf/perfiles',
                     'public_id' => 'profesor_'.$profesor->id,
@@ -242,7 +268,7 @@ class ProfesorController extends Controller
                 ]
             );
         } catch (\Throwable $e) {
-            \Log::error('Error subiendo foto de profesor: '.$e->getMessage());
+            Log::error('Error subiendo foto de profesor: '.$e->getMessage());
 
             return response()->json([
                 'message' => 'No se pudo subir la imagen. Inténtalo de nuevo.',
@@ -255,9 +281,23 @@ class ProfesorController extends Controller
         return response()->json($profesor->load('user', 'tipoContrato', 'especialidad', 'departamento', 'titulo'));
     }
 
-    public function destroy(string $id)
+    private function archivoRequerido(Request $request, string $campo): UploadedFile
     {
-        Profesor::findOrFail($id)->delete();
+        $archivo = $request->file($campo);
+
+        if (! $archivo instanceof UploadedFile) {
+            throw ValidationException::withMessages([
+                $campo => ['El archivo es obligatorio.'],
+            ]);
+        }
+
+        return $archivo;
+    }
+
+    /** @phpstan-return JsonResponse */
+    public function destroy(string $id): JsonResponse
+    {
+        Profesor::query()->findOrFail($id)->delete();
 
         return response()->json(['message' => 'Profesor eliminado correctamente.']);
     }

@@ -113,6 +113,18 @@ class Bitacora extends Model
     /** Filtros comunes al listado y a la exportación. */
     public function scopeFiltrar(Builder $query, array $f): Builder
     {
+        return self::aplicarFiltros($query, $f);
+    }
+
+    /** @param array<string, mixed> $f */
+    public static function consulta(array $f): Builder
+    {
+        return self::aplicarFiltros(static::query(), $f);
+    }
+
+    /** @param array<string, mixed> $f */
+    private static function aplicarFiltros(Builder $query, array $f): Builder
+    {
         return $query
             ->when($f['categoria'] ?? null, fn ($q, $v) => $q->whereIn('categoria', (array) $v))
             ->when($f['nivel'] ?? null, fn ($q, $v) => $q->whereIn('nivel', (array) $v))

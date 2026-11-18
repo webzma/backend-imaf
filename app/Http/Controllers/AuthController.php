@@ -10,6 +10,7 @@ use App\Services\Auditoria;
 use App\Services\CedulaEstudiante;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -77,7 +78,15 @@ class AuthController extends Controller
             array_merge($this->mensajesTipoDato(), $this->mensajesFotoCedula()),
         );
 
-        $user = DB::transaction(function () use ($request) {
+        $archivo = $request->file('foto_cedula');
+
+        if (! $archivo instanceof UploadedFile) {
+            throw ValidationException::withMessages([
+                'foto_cedula' => ['La foto de la cédula es obligatoria.'],
+            ]);
+        }
+
+        $user = DB::transaction(function () use ($request, $archivo) {
             $user = User::create([
                 'primer_nombre' => $request->primer_nombre,
                 'segundo_nombre' => $request->segundo_nombre,
@@ -104,7 +113,7 @@ class AuthController extends Controller
 
             $estudiante->update([
                 'foto_cedula' => CedulaEstudiante::subir(
-                    $request->file('foto_cedula'),
+                    $archivo,
                     $estudiante->id,
                 ),
             ]);
@@ -204,7 +213,7 @@ class AuthController extends Controller
     private function auditarLoginFallido(Request $request, ?User $user): void
     {
         $ventana = now()->subMinutes(config('auditoria.ventana_logins_fallidos_minutos', 15));
-        $previos = Bitacora::where('evento', 'auth.login_fallido')
+        $previos = Bitacora::query()->where('evento', 'auth.login_fallido')
             ->where('ip', $request->ip())
             ->where('created_at', '>=', $ventana)
             ->count();
@@ -290,7 +299,7 @@ class AuthController extends Controller
         ], $this->mensajesTipoDato());
 
         if (! empty($data['password'])) {
-            if (! Hash::check($data['password_actual'], $user->password)) {
+            if (! Hash::check((string) $data['password_actual'], $user->password)) {
                 throw ValidationException::withMessages([
                     'password_actual' => ['La contraseña actual no es correcta.'],
                 ]);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Curso;
+use Illuminate\Http\JsonResponse;
 
 /**
  * Datos públicos para la página de inicio (sin sesión).
@@ -12,8 +13,12 @@ use App\Models\Curso;
  */
 class PublicoController extends Controller
 {
-    /** Cursos abiertos: activos y sin terminar, los que empiezan antes primero. */
-    public function cursos()
+    /**
+     * Cursos abiertos: activos y sin terminar, los que empiezan antes primero.
+     *
+     * @phpstan-return JsonResponse
+     */
+    public function cursos(): JsonResponse
     {
         $cursos = Curso::query()
             ->where('estado', 'activo')

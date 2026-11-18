@@ -43,7 +43,7 @@ class Auditoria
      *     categoria?: string,
      *     nivel?: 'info'|'aviso'|'critico',
      *     actor?: User|null|false,
-     *     entidad?: Model|array{0: string, 1: int|string, 2?: string|null},
+     *     entidad?: Model|array{0: string, 1: int|string, 2?: string|null}|null,
      *     cambios?: array|null,
      *     metadatos?: array|null,
      * }  $opciones  `actor`: User explícito, false = "Sistema", omitido = el

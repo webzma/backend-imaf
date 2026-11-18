@@ -71,7 +71,7 @@ class CatalogoController extends Controller
         // opción antes de borrarla (al borrar, el campo les queda vacío).
         $relacion = self::RELACION_USO[$slug] ?? 'profesores';
 
-        return response()->json($modelo::withCount($relacion)->orderBy('nombre')->get());
+        return response()->json($modelo::query()->withCount($relacion)->orderBy('nombre')->get());
     }
 
     /**
@@ -87,7 +87,7 @@ class CatalogoController extends Controller
             'nombre' => ['required', 'string', 'max:255', 'unique:'.$modelo->getTable().',nombre', self::REGEX_NOMBRE],
         ], self::MENSAJES);
 
-        $registro = $modelo->create($data);
+        $registro = $modelo::query()->create($data);
 
         return response()->json($registro, 201);
     }
@@ -98,7 +98,7 @@ class CatalogoController extends Controller
     public function update(Request $request, string $slug, string $id): JsonResponse
     {
         $modelo = $this->modelo($slug);
-        $registro = $modelo->findOrFail($id);
+        $registro = $modelo::query()->findOrFail($id);
 
         $request->merge(['nombre' => trim((string) $request->input('nombre'))]);
 
@@ -117,7 +117,7 @@ class CatalogoController extends Controller
     public function destroy(string $slug, string $id): JsonResponse
     {
         $modelo = $this->modelo($slug);
-        $registro = $modelo->findOrFail($id);
+        $registro = $modelo::query()->findOrFail($id);
         $registro->delete();
 
         return response()->json(['message' => 'Registro eliminado correctamente.']);

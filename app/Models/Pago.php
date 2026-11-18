@@ -8,6 +8,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @method static Builder deCurso(int|string $cursoId)
+ * @method static Builder deUsuario(int $userId)
+ */
 class Pago extends Model
 {
     use Auditable;

@@ -9,17 +9,24 @@ use App\Models\Profesor;
 use App\Models\User;
 use App\Notifications\GenericNotification;
 use App\Services\Auditoria;
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Cloudinary\Cloudinary as CloudinaryClient;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PagoController extends Controller
 {
     // Estudiante: ver sus propios pagos (con historial completo incluyendo rechazados)
-    public function studentIndex(Request $request)
+    /**
+     * @phpstan-return JsonResponse
+     */
+    public function studentIndex(Request $request): JsonResponse
     {
-        $query = Pago::with('curso')
-            ->deUsuario($request->user()->id)
+        $query = Pago::query()->with('curso')
+            ->whereHas('inscripcion.estudiante', fn (Builder $e) => $e->where('user_id', $request->user()->id))
             ->latest();
 
         if ($request->filled('estado')) {
@@ -27,14 +34,17 @@ class PagoController extends Controller
         }
 
         if ($request->filled('curso_id')) {
-            $query->deCurso($request->curso_id);
+            $query->whereHas('inscripcion', fn (Builder $i) => $i->where('curso_id', $request->curso_id));
         }
 
         return response()->json($query->paginate(10));
     }
 
     // Estudiante: reportar un pago (transferencia, pago móvil o efectivo) para inscribirse
-    public function store(Request $request)
+    /**
+     * @phpstan-return JsonResponse
+     */
+    public function store(Request $request): JsonResponse
     {
         $request->validate([
             'curso_id' => 'required|exists:cursos,id',
@@ -48,8 +58,10 @@ class PagoController extends Controller
         ]);
 
         $user = $request->user();
-        $estudiante = Estudiante::where('user_id', $user->id)->firstOrFail();
-        $curso = Curso::findOrFail($request->curso_id);
+        /** @var Estudiante $estudiante */
+        $estudiante = Estudiante::query()->where('user_id', $user->id)->firstOrFail();
+        /** @var Curso $curso */
+        $curso = Curso::query()->findOrFail($request->curso_id);
 
         $finalizado = $curso->fecha_fin && $curso->fecha_fin->isPast();
         if ($curso->estado !== 'activo' || $finalizado) {
@@ -65,8 +77,9 @@ class PagoController extends Controller
         }
 
         // No permitir doble envío si ya hay un pago pendiente o aprobado
-        $existe = Pago::deUsuario($user->id)
-            ->deCurso($request->curso_id)
+        $existe = Pago::query()
+            ->whereHas('inscripcion.estudiante', fn (Builder $e) => $e->where('user_id', $user->id))
+            ->whereHas('inscripcion', fn (Builder $i) => $i->where('curso_id', $request->curso_id))
             ->whereIn('estado', ['pendiente', 'aprobado'])
             ->exists();
 
@@ -78,8 +91,8 @@ class PagoController extends Controller
 
         $comprobanteId = null;
         if ($request->hasFile('comprobante')) {
-            $uploadedFile = Cloudinary::uploadApi()->upload(
-                $request->file('comprobante')->getRealPath(),
+            $uploadedFile = app(CloudinaryClient::class)->uploadApi()->upload(
+                $this->archivoRequerido($request, 'comprobante')->getRealPath(),
                 ['folder' => 'imaf/comprobantes']
             );
             $comprobanteId = $uploadedFile['public_id'];
@@ -96,7 +109,7 @@ class PagoController extends Controller
         }
         $inscripcion->save();
 
-        $pago = Pago::create([
+        $pago = Pago::query()->create([
             'inscripcion_id' => $inscripcion->id,
             'metodo_pago' => $request->metodo_pago,
             'referencia' => $esEfectivo ? null : $request->referencia,
@@ -112,7 +125,8 @@ class PagoController extends Controller
         ][$request->metodo_pago];
 
         // Notificar a los administradores
-        $admins = User::where('role', 'admin')->get();
+        $admins = User::query()->where('role', 'admin')->get();
+        /** @var User $admin */
         foreach ($admins as $admin) {
             $admin->notify(new GenericNotification(
                 'Nueva Solicitud de Pago',
@@ -147,9 +161,12 @@ class PagoController extends Controller
         'estado' => 'estado',
     ];
 
-    public function index(Request $request)
+    /**
+     * @phpstan-return JsonResponse
+     */
+    public function index(Request $request): JsonResponse
     {
-        $query = Pago::with(['curso', 'estudiante.user', 'inscripcion']);
+        $query = Pago::query()->with(['curso', 'estudiante.user', 'inscripcion']);
 
         if ($search = $this->terminoBusqueda($request)) {
             $query->where(function ($q) use ($search) {
@@ -166,7 +183,7 @@ class PagoController extends Controller
         }
 
         if ($request->filled('curso_id')) {
-            $query->deCurso($request->curso_id);
+            $query->whereHas('inscripcion', fn (Builder $i) => $i->where('curso_id', $request->curso_id));
         }
 
         if ($request->filled('fecha_desde')) {
@@ -196,26 +213,34 @@ class PagoController extends Controller
         return response()->json($pagos);
     }
 
-    /** Totales por estado sobre la tabla completa, para las tarjetas de resumen. */
-    public function resumen()
+    /**
+     * Totales por estado sobre la tabla completa, para las tarjetas de resumen.
+     *
+     * @phpstan-return JsonResponse
+     */
+    public function resumen(): JsonResponse
     {
         return response()->json([
-            'total' => Pago::count(),
-            'pendiente' => Pago::where('estado', 'pendiente')->count(),
-            'aprobado' => Pago::where('estado', 'aprobado')->count(),
-            'rechazado' => Pago::where('estado', 'rechazado')->count(),
+            'total' => Pago::query()->count(),
+            'pendiente' => Pago::query()->where('estado', 'pendiente')->count(),
+            'aprobado' => Pago::query()->where('estado', 'aprobado')->count(),
+            'rechazado' => Pago::query()->where('estado', 'rechazado')->count(),
         ]);
     }
 
     // Admin: aprobar o rechazar pago
-    public function update(Request $request, string $id)
+    /**
+     * @phpstan-return JsonResponse
+     */
+    public function update(Request $request, string $id): JsonResponse
     {
         $request->validate([
             'estado' => 'required|in:aprobado,rechazado',
             'nota_admin' => 'nullable|string|max:500',
         ]);
 
-        $pago = Pago::with(['curso', 'estudiante.user', 'inscripcion'])->findOrFail($id);
+        /** @var Pago $pago */
+        $pago = Pago::query()->with(['curso', 'estudiante.user', 'inscripcion'])->findOrFail($id);
 
         $resultado = $this->procesarPago($pago, $request->estado, $request->nota_admin);
 
@@ -237,8 +262,10 @@ class PagoController extends Controller
      * cerrar. Cada pago se procesa por separado y con su propia transacción,
      * así que uno que falle por cupo agotado no arrastra a los demás; la
      * respuesta dice cuáles quedaron fuera y por qué.
+     *
+     * @phpstan-return JsonResponse
      */
-    public function updateMasivo(Request $request)
+    public function updateMasivo(Request $request): JsonResponse
     {
         $datos = $request->validate([
             'ids' => 'required|array|min:1|max:100',
@@ -250,7 +277,8 @@ class PagoController extends Controller
         $procesados = 0;
         $fallidos = [];
 
-        foreach (Pago::with(['curso', 'estudiante.user', 'inscripcion'])->whereIn('id', $datos['ids'])->get() as $pago) {
+        /** @var Pago $pago */
+        foreach (Pago::query()->with(['curso', 'estudiante.user', 'inscripcion'])->whereIn('id', $datos['ids'])->get() as $pago) {
             $resultado = $this->procesarPago($pago, $datos['estado'], $datos['nota_admin'] ?? null);
 
             if ($resultado['ok']) {
@@ -287,7 +315,8 @@ class PagoController extends Controller
 
         DB::transaction(function () use ($pago, $estado, $nota, &$cupoAgotado) {
             // Bloquear el curso para evitar aprobaciones simultáneas que excedan el cupo
-            $curso = Curso::lockForUpdate()->findOrFail($pago->curso_id);
+            /** @var Curso $curso */
+            $curso = Curso::query()->lockForUpdate()->findOrFail($pago->curso_id);
 
             $estudiante = $pago->inscripcion->estudiante;
 
@@ -310,7 +339,7 @@ class PagoController extends Controller
                     // El curso pagado pasa a ser el actual; el anterior queda
                     // en `inscripciones`.
                     $estudiante->update(['estado' => 'activo']);
-                    $estudiante->asignarCursoActual($pago->curso_id);
+                    $estudiante->asignarCursoActual((int) $pago->curso_id);
                 } else {
                     $this->rechazarInscripcion($estudiante, $pago);
                 }
@@ -348,9 +377,11 @@ class PagoController extends Controller
 
         // Si el pago fue aprobado, notificar al profesor del curso
         if ($estado === 'aprobado') {
-            $curso = Curso::find($pago->curso_id);
+            /** @var Curso|null $curso */
+            $curso = Curso::query()->find($pago->curso_id);
             if ($curso && $curso->profesor_id) {
-                $profesor = Profesor::with('user')->find($curso->profesor_id);
+                /** @var Profesor|null $profesor */
+                $profesor = Profesor::query()->with('user')->find($curso->profesor_id);
                 if ($profesor && $profesor->user) {
                     $estudianteNombre = $pago->user->name ?? 'Un estudiante';
                     $profesor->user->notify(new GenericNotification(
@@ -374,7 +405,7 @@ class PagoController extends Controller
      */
     private function rechazarInscripcion(Estudiante $estudiante, Pago $pago): void
     {
-        $otroPagoAprobado = Pago::where('inscripcion_id', $pago->inscripcion_id)
+        $otroPagoAprobado = Pago::query()->where('inscripcion_id', $pago->inscripcion_id)
             ->where('estado', 'aprobado')
             ->whereKeyNot($pago->id)
             ->exists();
@@ -410,17 +441,37 @@ class PagoController extends Controller
     }
 
     // Admin: eliminar pago (y su comprobante)
-    public function destroy(string $id)
+    /**
+     * @phpstan-return JsonResponse
+     */
+    public function destroy(string $id): JsonResponse
     {
-        $pago = Pago::findOrFail($id);
+        /** @var Pago $pago */
+        $pago = Pago::query()->findOrFail($id);
         if (! empty($pago->comprobante)) {
-            Cloudinary::uploadApi()->destroy($pago->comprobante);
+            app(CloudinaryClient::class)->uploadApi()->destroy($pago->comprobante);
         }
         $pago->forceDelete();
 
         return response()->json(['message' => 'Pago eliminado.']);
     }
 
+    private function archivoRequerido(Request $request, string $campo): UploadedFile
+    {
+        $archivo = $request->file($campo);
+
+        if (! $archivo instanceof UploadedFile) {
+            throw ValidationException::withMessages([
+                $campo => ['El archivo es obligatorio.'],
+            ]);
+        }
+
+        return $archivo;
+    }
+
+    /**
+     * @phpstan-return array<string,mixed>
+     */
     private function formatPago(Pago $pago): array
     {
         $curso = $pago->curso;
