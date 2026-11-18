@@ -16,6 +16,12 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class AsignarSolicitudId
 {
+    /**
+     * @phpstan-param Request $request
+     * @phpstan-param Closure(Request): Response $next
+     *
+     * @phpstan-return Response
+     */
     public function handle(Request $request, Closure $next): Response
     {
         $entrante = $request->headers->get('X-Request-Id');
