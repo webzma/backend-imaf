@@ -82,8 +82,12 @@ class CursoEstadoService
 
     private static function notificar(Curso $curso, string $titulo, string $mensaje): void
     {
-        $admins = User::where('role', 'admin')->get();
+        $admins = User::query()->where('role', 'admin')->get();
         foreach ($admins as $admin) {
+            if (! $admin instanceof User) {
+                continue;
+            }
+
             $admin->notify(new GenericNotification($titulo, $mensaje, "/admin/cursos/{$curso->id}"));
         }
 

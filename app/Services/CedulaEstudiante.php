@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Cloudinary\Cloudinary as CloudinaryClient;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 
@@ -17,7 +17,7 @@ class CedulaEstudiante
     public static function subir(UploadedFile $archivo, int $estudianteId): string
     {
         try {
-            $upload = Cloudinary::uploadApi()->upload($archivo->getRealPath(), [
+            $upload = app(CloudinaryClient::class)->uploadApi()->upload((string) $archivo->getRealPath(), [
                 'folder' => 'imaf/cedulas',
                 'public_id' => 'estudiante_'.$estudianteId,
                 'overwrite' => true,
@@ -29,6 +29,6 @@ class CedulaEstudiante
             abort(500, 'No se pudo subir la imagen de la cédula. Inténtalo de nuevo.');
         }
 
-        return $upload['secure_url'];
+        return (string) $upload['secure_url'];
     }
 }

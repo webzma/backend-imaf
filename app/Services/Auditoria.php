@@ -93,7 +93,11 @@ class Auditoria
         }
     }
 
-    /** Ejecuta `$callback` sin registrar nada (semillas, migraciones de datos). */
+    /**
+     * Ejecuta `$callback` sin registrar nada (semillas, migraciones de datos).
+     *
+     * @param  callable(): mixed  $callback
+     */
     public static function sinRegistro(callable $callback): mixed
     {
         $previo = self::$silenciada;
@@ -110,6 +114,8 @@ class Auditoria
      * Ejecuta `$callback` atribuyendo sus eventos al sistema, no al usuario de
      * la petición: procesos automáticos que corren dentro de una petición
      * ajena (p. ej. la sincronización de estados de cursos).
+     *
+     * @param  callable(): mixed  $callback
      */
     public static function comoSistema(callable $callback): mixed
     {
@@ -169,7 +175,14 @@ class Auditoria
             return null;
         }
 
-        return json_decode(json_encode(self::ocultar($datos), JSON_UNESCAPED_UNICODE), true);
+        $json = json_encode(self::ocultar($datos), JSON_UNESCAPED_UNICODE);
+        if ($json === false) {
+            return null;
+        }
+
+        $normalizado = json_decode($json, true);
+
+        return is_array($normalizado) ? $normalizado : null;
     }
 
     private static function categoria(string $evento): string
@@ -184,11 +197,13 @@ class Auditoria
     {
         if ($entidad instanceof Model) {
             $alias = method_exists($entidad, 'auditEntidad')
-                ? $entidad->auditEntidad()
+                ? (string) call_user_func([$entidad, 'auditEntidad'])
                 : Str::snake(class_basename($entidad));
-            $etiqueta = method_exists($entidad, 'auditEtiqueta') ? $entidad->auditEtiqueta() : null;
+            $etiqueta = method_exists($entidad, 'auditEtiqueta')
+                ? call_user_func([$entidad, 'auditEtiqueta'])
+                : null;
 
-            return [$alias, (string) $entidad->getKey(), $etiqueta];
+            return [$alias, (string) $entidad->getKey(), is_string($etiqueta) ? $etiqueta : null];
         }
         if (is_array($entidad)) {
             return [$entidad[0], (string) $entidad[1], $entidad[2] ?? null];
