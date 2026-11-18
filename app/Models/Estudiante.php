@@ -7,11 +7,16 @@ use App\Services\Auditoria;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 
 /**
- * @method static Builder conEstadoPago(string $estado)
+ * @method static Builder<Estudiante> conEstadoPago(string $estado)
  */
 class Estudiante extends Model
 {
@@ -90,7 +95,11 @@ class Estudiante extends Model
             ?? 'pendiente';
     }
 
-    /** Filtra por el mismo valor que devuelve `estado_pago`. */
+    /**
+     * Filtra por el mismo valor que devuelve `estado_pago`.
+     *
+     * @param  Builder<Estudiante>  $query
+     */
     public function scopeConEstadoPago(Builder $query, string $estado): void
     {
         $query->whereRaw(
@@ -244,39 +253,54 @@ class Estudiante extends Model
         return $curso?->enCurso() ? $curso : null;
     }
 
-    public function user()
+    /** @phpstan-return BelongsTo<User, Estudiante> */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /** Curso actual, a través de su inscripción marcada como tal. */
-    public function curso()
+    /**
+     * Curso actual, a través de su inscripción marcada como tal.
+     *
+     * @phpstan-return HasOneThrough<Curso, Inscripcion, Estudiante>
+     */
+    public function curso(): HasOneThrough
     {
         return $this->hasOneThrough(Curso::class, Inscripcion::class, 'estudiante_id', 'id', 'id', 'curso_id')
             ->where('inscripciones.es_actual', true)
             ->where('inscripciones.estado_pago', 'aprobado');
     }
 
-    public function inscripcionActual()
+    /** @phpstan-return HasOne<Inscripcion, Estudiante> */
+    public function inscripcionActual(): HasOne
     {
         return $this->hasOne(Inscripcion::class)
             ->where('es_actual', true)
             ->where('estado_pago', 'aprobado');
     }
 
-    /** La inscripción movida más recientemente: su última solicitud. */
-    public function ultimaInscripcion()
+    /**
+     * La inscripción movida más recientemente: su última solicitud.
+     *
+     * @phpstan-return HasOne<Inscripcion, Estudiante>
+     */
+    public function ultimaInscripcion(): HasOne
     {
         return $this->hasOne(Inscripcion::class)->latestOfMany(['updated_at', 'id']);
     }
 
-    public function inscripciones()
+    /** @phpstan-return HasMany<Inscripcion, Estudiante> */
+    public function inscripciones(): HasMany
     {
         return $this->hasMany(Inscripcion::class);
     }
 
-    /** Todos los cursos en los que se ha inscrito con el pago aprobado. */
-    public function cursos()
+    /**
+     * Todos los cursos en los que se ha inscrito con el pago aprobado.
+     *
+     * @phpstan-return BelongsToMany<Curso, Estudiante>
+     */
+    public function cursos(): BelongsToMany
     {
         return $this->belongsToMany(Curso::class, 'inscripciones')
             ->wherePivot('estado_pago', 'aprobado')

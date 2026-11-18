@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Asistencia extends Model
 {
@@ -20,12 +21,14 @@ class Asistencia extends Model
         ];
     }
 
-    public function sesion()
+    /** @phpstan-return BelongsTo<Sesion, Asistencia> */
+    public function sesion(): BelongsTo
     {
         return $this->belongsTo(Sesion::class);
     }
 
-    public function estudiante()
+    /** @phpstan-return BelongsTo<Estudiante, Asistencia> */
+    public function estudiante(): BelongsTo
     {
         return $this->belongsTo(Estudiante::class);
     }

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
 /**
@@ -46,7 +47,8 @@ class Bitacora extends Model
         static::deleting(fn () => throw new LogicException('Los registros de la bitácora no se pueden eliminar.'));
     }
 
-    public function actor()
+    /** @phpstan-return BelongsTo<User, Bitacora> */
+    public function actor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'actor_id');
     }
@@ -83,12 +85,14 @@ class Bitacora extends Model
     /**
      * HMAC-SHA256 de la forma canónica de los datos: claves ordenadas en
      * todos los niveles, porque MySQL reordena las de las columnas JSON.
+     *
+     * @param  array<string, mixed>  $datos
      */
     public static function calcularHuella(array $datos): string
     {
         return hash_hmac(
             'sha256',
-            json_encode(self::canonico($datos), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            (string) json_encode(self::canonico($datos), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             (string) config('auditoria.clave'),
         );
     }
@@ -110,19 +114,35 @@ class Bitacora extends Model
         return hash_equals($this->huella, self::calcularHuella($this->datosFirmados()));
     }
 
-    /** Filtros comunes al listado y a la exportación. */
+    /**
+     * Filtros comunes al listado y a la exportación.
+     *
+     * @param  Builder<Bitacora>  $query
+     * @param  array<string, mixed>  $f
+     *
+     * @phpstan-return Builder<Bitacora>
+     */
     public function scopeFiltrar(Builder $query, array $f): Builder
     {
         return self::aplicarFiltros($query, $f);
     }
 
-    /** @param array<string, mixed> $f */
+    /**
+     * @param  array<string, mixed>  $f
+     *
+     * @phpstan-return Builder<Bitacora>
+     */
     public static function consulta(array $f): Builder
     {
         return self::aplicarFiltros(static::query(), $f);
     }
 
-    /** @param array<string, mixed> $f */
+    /**
+     * @param  Builder<Bitacora>  $query
+     * @param  array<string, mixed>  $f
+     *
+     * @phpstan-return Builder<Bitacora>
+     */
     private static function aplicarFiltros(Builder $query, array $f): Builder
     {
         return $query
